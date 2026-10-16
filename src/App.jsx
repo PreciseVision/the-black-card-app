@@ -1,4 +1,67 @@
-import React, { useState, useMemo, useRef } from 'react';// Core SP Thresholdsconst TIER_THRESHOLDS = {GOD: 50001,AUNTIE: 10001,BRO: 5001,FAM: 1001,KIN: 10,};const REQUIRED_SP_FOR_CARD = TIER_THRESHOLDS.KIN;const SP_FOR_REVOKED_RECOVERY = 100;// Designated Master Admin User IDsconst ADMIN_USER_IDS = ['user-jay-001'];// Solid Pan-African & Heritage Paletteconst PALETTE = {red: '#B91C1C',black: '#000000',darkCard: '#18181B',green: '#007A3D',gold: '#F59E0B',white: '#FFFFFF',lightBg: '#F4F4F5',lightCard: '#E4E4E7',grayText: '#A1A1AA',};// Tier Evaluation Helperconst getTierInfo = (sp, blackCardStatus) => {if (blackCardStatus === 'revoked') {return { name: 'Revoked', color: PALETTE.red };}if (blackCardStatus === 'suspended') {return { name: 'Suspended', color: PALETTE.gold };}if (sp >= TIER_THRESHOLDS.GOD) {return { name: 'God Mother / God Father', color: PALETTE.gold };}if (sp >= TIER_THRESHOLDS.AUNTIE) {return { name: 'Auntie / Unk', color: PALETTE.gold };}if (sp >= TIER_THRESHOLDS.BRO) {return { name: 'Bro / Sis', color: PALETTE.green };}if (sp >= TIER_THRESHOLDS.FAM) {return { name: 'Fam', color: PALETTE.green };}if (sp >= TIER_THRESHOLDS.KIN) {return { name: 'Kin Folk', color: PALETTE.green };}return { name: 'Unvouched', color: PALETTE.grayText };};// 1967 Black American Heritage Flag (Melvin Charles & Gleason T. Jackson)const BlackAmericanHeritageLogo = ({ className = "w-9 h-6", roundClass = "rounded-lg" }) => (<svgviewBox="0 0 120 80"className={${className} ${roundClass} flex-shrink-0}xmlns="http://www.w3.org/2000/svg"{/* Base Red field */}
+import React, { useState, useMemo, useRef } from 'react';
+
+// Core SP Thresholds
+const TIER_THRESHOLDS = {
+GOD: 50001,
+AUNTIE: 10001,
+BRO: 5001,
+FAM: 1001,
+KIN: 10,
+};
+
+const REQUIRED_SP_FOR_CARD = TIER_THRESHOLDS.KIN;
+const SP_FOR_REVOKED_RECOVERY = 100;
+
+// Designated Master Admin User IDs
+const ADMIN_USER_IDS = ['user-jay-001'];
+
+// Solid Pan-African & Heritage Palette
+const PALETTE = {
+red: '#B91C1C',
+black: '#000000',
+darkCard: '#18181B',
+green: '#007A3D',
+gold: '#F59E0B',
+white: '#FFFFFF',
+lightBg: '#F4F4F5',
+lightCard: '#E4E4E7',
+grayText: '#A1A1AA',
+};
+
+// Tier Evaluation Helper
+const getTierInfo = (sp, blackCardStatus) => {
+if (blackCardStatus === 'revoked') {
+return { name: 'Revoked', color: PALETTE.red };
+}
+if (blackCardStatus === 'suspended') {
+return { name: 'Suspended', color: PALETTE.gold };
+}
+if (sp >= TIER_THRESHOLDS.GOD) {
+return { name: 'God Mother / God Father', color: PALETTE.gold };
+}
+if (sp >= TIER_THRESHOLDS.AUNTIE) {
+return { name: 'Auntie / Unk', color: PALETTE.gold };
+}
+if (sp >= TIER_THRESHOLDS.BRO) {
+return { name: 'Bro / Sis', color: PALETTE.green };
+}
+if (sp >= TIER_THRESHOLDS.FAM) {
+return { name: 'Fam', color: PALETTE.green };
+}
+if (sp >= TIER_THRESHOLDS.KIN) {
+return { name: 'Kin Folk', color: PALETTE.green };
+}
+return { name: 'Unvouched', color: PALETTE.grayText };
+};
+
+// 1967 Black American Heritage Flag (Melvin Charles & Gleason T. Jackson)
+const BlackAmericanHeritageLogo = ({ className = "w-9 h-6", roundClass = "rounded-lg" }) => (
+<svg
+viewBox="0 0 120 80"
+className={${className} ${roundClass} flex-shrink-0}
+xmlns="http://www.w3.org/2000/svg"
+
+{/* Base Red field */}
 <rect width="120" height="80" fill={PALETTE.red} />
 
 {/* Center diagonal broad black band */}
@@ -23,7 +86,255 @@ import React, { useState, useMemo, useRef } from 'react';// Core SP Thresholdsco
   <rect x="-1" y="10" width="2" height="6" fill={PALETTE.gold} />
   <circle cx="0" cy="18" r="2.5" fill={PALETTE.gold} />
 </g>
-const UserIcon = ({ className = "w-6 h-6" }) => ();const FeedIcon = ({ className = "w-6 h-6" }) => ();const FriendsIcon = ({ className = "w-6 h-6" }) => ();const BanIcon = ({ className = "w-6 h-6" }) => ();const QrIcon = ({ className = "w-6 h-6" }) => ();const CameraIcon = ({ className = "w-5 h-5" }) => ();const PhotoIcon = ({ className = "w-5 h-5" }) => ();const VideoIcon = ({ className = "w-5 h-5" }) => ();const MicIcon = ({ className = "w-5 h-5" }) => ();const ShareIcon = ({ className = "w-5 h-5" }) => ();const CloseIcon = ({ className = "w-5 h-5" }) => ();const SEED_PROFILES = {'user-jay-001': {userId: 'user-jay-001',username: 'Godfather Jay',bio: 'Preserving our culture and holding the council accountable. I vouch for who I want.',personalStatus: 'Watching over the cookout with clarity.',blackCardStatus: 'active',socialProof: 50420,earnedSP: 15,isAdmin: true,suspensionStartDate: null,avatarText: 'GJ',avatarBg: PALETTE.gold,},'user-deb-002': {userId: 'user-deb-002',username: 'Aunty Deb',bio: 'Making sure everybody ate and nobody playing on the family name.',personalStatus: 'Who brought this dry potato salad?!',blackCardStatus: 'active',socialProof: 12450,earnedSP: 22,isAdmin: false,suspensionStartDate: null,avatarText: 'AD',avatarBg: PALETTE.green,},'user-mike-003': {userId: 'user-mike-003',username: 'MikeFresh',bio: 'Creative director, storyteller, building community archives.',personalStatus: 'Always invited to the cookout.',blackCardStatus: 'active',socialProof: 6200,earnedSP: 9,isAdmin: false,suspensionStartDate: null,avatarText: 'MF',avatarBg: PALETTE.gold,},'user-coolio-004': {userId: 'user-coolio-004',username: 'Coolio',bio: 'Certified grill master and music curator.',personalStatus: 'Smoking ribs till sundown.',blackCardStatus: 'active',socialProof: 45,earnedSP: 5,isAdmin: false,suspensionStartDate: null,avatarText: 'C',avatarBg: PALETTE.green,},'user-sue-005': {userId: 'user-sue-005',username: 'SuspendedSue',bio: 'In the penalty box learning discipline. Be back soon.',personalStatus: 'Serving out my 30 days quietly.',blackCardStatus: 'suspended',socialProof: 120,earnedSP: 0,isAdmin: false,suspensionStartDate: Date.now() - (6 * 24 * 60 * 60 * 1000),avatarText: 'SS',avatarBg: PALETTE.gold,},'user-reggie-006': {userId: 'user-reggie-006',username: 'RevokedReggie',bio: 'Fumbled the bag in public. Working to rebuild my 100 SP.',personalStatus: 'Humbled and trying to recover my card.',blackCardStatus: 'revoked',socialProof: 14,earnedSP: 0,isAdmin: false,suspensionStartDate: null,avatarText: 'RR',avatarBg: PALETTE.red,},};export default function App() {const [isAuthenticated, setIsAuthenticated] = useState(true);const [authMode, setAuthMode] = useState('phone');const [authInput, setAuthInput] = useState('');const [authOtp, setAuthOtp] = useState('');const [authStep, setAuthStep] = useState('input');const [currentUserId] = useState('user-jay-001');const [currentTab, setCurrentTab] = useState('home');const [selectedProfileId, setSelectedProfileId] = useState('user-jay-001');const [theme, setTheme] = useState('dark');const [notification, setNotification] = useState(null);const [profiles, setProfiles] = useState(SEED_PROFILES);const [directoryFilter, setDirectoryFilter] = useState('');const [bannedFilter, setBannedFilter] = useState('all');const [feedLogs, setFeedLogs] = useState([{id: 'log-1',type: 'vouch',authorName: 'Godfather Jay',targetName: 'MikeFresh',amount: 10,timestamp: Date.now() - 3600000,},{id: 'log-2',type: 'wall_post',authorId: 'user-deb-002',authorName: 'Aunty Deb',text: 'Make sure everybody checks on @MikeFresh before the event tomorrow. Bring containers!',image: null,video: null,audio: null,timestamp: Date.now() - 7200000,},]);const [wallText, setWallText] = useState('');const [attachedImage, setAttachedImage] = useState(null);const [attachedVideo, setAttachedVideo] = useState(null);const [attachedAudio, setAttachedAudio] = useState(null);const [isRecordingAudio, setIsRecordingAudio] = useState(false);const [recordingSeconds, setRecordingSeconds] = useState(0);const [mentionQuery, setMentionQuery] = useState(null);const [adminTargetSpInput, setAdminTargetSpInput] = useState('');const [adminMemberSearchTerm, setAdminMemberSearchTerm] = useState('');const [showAdminScanner, setShowAdminScanner] = useState(false);const [shareAuditLogs, setShareAuditLogs] = useState([{id: 'trk-seed-1',trackingId: 'TRK-BCH891',senderName: 'Godfather Jay',targetName: 'Community Passcard',channel: 'Direct Copy',clicks: 14,timestamp: Date.now() - 86400000,},]);const [showQrModal, setShowQrModal] = useState(false);const [showSanctionModal, setShowSanctionModal] = useState(null);const [sanctionReason, setSanctionReason] = useState('');const wallPhotoInputRef = useRef(null);const wallVideoInputRef = useRef(null);const avatarInputRef = useRef(null);const mediaRecorderRef = useRef(null);const audioChunksRef = useRef([]);const recordingTimerRef = useRef(null);const scannerVideoRef = useRef(null);const scannerStreamRef = useRef(null);const myProfile = profiles[currentUserId] || profiles['user-jay-001'];const targetProfile = profiles[selectedProfileId] || myProfile;const isMyProfile = selectedProfileId === currentUserId;const isCurrentUserAdmin = Boolean(myProfile.isAdmin || ADMIN_USER_IDS.includes(currentUserId));const triggerNotification = (message, isError = false) => {setNotification({ message, isError });setTimeout(() => {setNotification(null);}, 3200);};const handleStartAudioRecord = async () => {try {if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {triggerNotification('Microphone recording not supported on this browser.', true);return;}const stream = await navigator.mediaDevices.getUserMedia({ audio: true });const recorder = new MediaRecorder(stream);mediaRecorderRef.current = recorder;audioChunksRef.current = [];  recorder.ondataavailable = (e) => {
+
+
+const UserIcon = ({ className = "w-6 h-6" }) => (
+
+
+
+);
+
+const FeedIcon = ({ className = "w-6 h-6" }) => (
+
+
+
+);
+
+const FriendsIcon = ({ className = "w-6 h-6" }) => (
+
+
+
+);
+
+const BanIcon = ({ className = "w-6 h-6" }) => (
+
+
+
+);
+
+const QrIcon = ({ className = "w-6 h-6" }) => (
+
+
+
+);
+
+const CameraIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+
+);
+
+const PhotoIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+);
+
+const VideoIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+);
+
+const MicIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+);
+
+const ShareIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+);
+
+const CloseIcon = ({ className = "w-5 h-5" }) => (
+
+
+
+);
+
+const SEED_PROFILES = {
+'user-jay-001': {
+userId: 'user-jay-001',
+username: 'Godfather Jay',
+bio: 'Preserving our culture and holding the council accountable. I vouch for who I want.',
+personalStatus: 'Watching over the cookout with clarity.',
+blackCardStatus: 'active',
+socialProof: 50420,
+earnedSP: 15,
+isAdmin: true,
+suspensionStartDate: null,
+avatarText: 'GJ',
+avatarBg: PALETTE.gold,
+},
+'user-deb-002': {
+userId: 'user-deb-002',
+username: 'Aunty Deb',
+bio: 'Making sure everybody ate and nobody playing on the family name.',
+personalStatus: 'Who brought this dry potato salad?!',
+blackCardStatus: 'active',
+socialProof: 12450,
+earnedSP: 22,
+isAdmin: false,
+suspensionStartDate: null,
+avatarText: 'AD',
+avatarBg: PALETTE.green,
+},
+'user-mike-003': {
+userId: 'user-mike-003',
+username: 'MikeFresh',
+bio: 'Creative director, storyteller, building community archives.',
+personalStatus: 'Always invited to the cookout.',
+blackCardStatus: 'active',
+socialProof: 6200,
+earnedSP: 9,
+isAdmin: false,
+suspensionStartDate: null,
+avatarText: 'MF',
+avatarBg: PALETTE.gold,
+},
+'user-coolio-004': {
+userId: 'user-coolio-004',
+username: 'Coolio',
+bio: 'Certified grill master and music curator.',
+personalStatus: 'Smoking ribs till sundown.',
+blackCardStatus: 'active',
+socialProof: 45,
+earnedSP: 5,
+isAdmin: false,
+suspensionStartDate: null,
+avatarText: 'C',
+avatarBg: PALETTE.green,
+},
+'user-sue-005': {
+userId: 'user-sue-005',
+username: 'SuspendedSue',
+bio: 'In the penalty box learning discipline. Be back soon.',
+personalStatus: 'Serving out my 30 days quietly.',
+blackCardStatus: 'suspended',
+socialProof: 120,
+earnedSP: 0,
+isAdmin: false,
+suspensionStartDate: Date.now() - (6 * 24 * 60 * 60 * 1000),
+avatarText: 'SS',
+avatarBg: PALETTE.gold,
+},
+'user-reggie-006': {
+userId: 'user-reggie-006',
+username: 'RevokedReggie',
+bio: 'Fumbled the bag in public. Working to rebuild my 100 SP.',
+personalStatus: 'Humbled and trying to recover my card.',
+blackCardStatus: 'revoked',
+socialProof: 14,
+earnedSP: 0,
+isAdmin: false,
+suspensionStartDate: null,
+avatarText: 'RR',
+avatarBg: PALETTE.red,
+},
+};
+
+export default function App() {
+const [isAuthenticated, setIsAuthenticated] = useState(true);
+const [authMode, setAuthMode] = useState('phone');
+const [authInput, setAuthInput] = useState('');
+const [authOtp, setAuthOtp] = useState('');
+const [authStep, setAuthStep] = useState('input');
+const [currentUserId] = useState('user-jay-001');
+
+const [currentTab, setCurrentTab] = useState('home');
+const [selectedProfileId, setSelectedProfileId] = useState('user-jay-001');
+const [theme, setTheme] = useState('dark');
+const [notification, setNotification] = useState(null);
+
+const [profiles, setProfiles] = useState(SEED_PROFILES);
+const [directoryFilter, setDirectoryFilter] = useState('');
+const [bannedFilter, setBannedFilter] = useState('all');
+
+const [feedLogs, setFeedLogs] = useState([
+{
+id: 'log-1',
+type: 'vouch',
+authorName: 'Godfather Jay',
+targetName: 'MikeFresh',
+amount: 10,
+timestamp: Date.now() - 3600000,
+},
+{
+id: 'log-2',
+type: 'wall_post',
+authorId: 'user-deb-002',
+authorName: 'Aunty Deb',
+text: 'Make sure everybody checks on @MikeFresh before the event tomorrow. Bring containers!',
+image: null,
+video: null,
+audio: null,
+timestamp: Date.now() - 7200000,
+},
+]);
+
+const [wallText, setWallText] = useState('');
+const [attachedImage, setAttachedImage] = useState(null);
+const [attachedVideo, setAttachedVideo] = useState(null);
+const [attachedAudio, setAttachedAudio] = useState(null);
+const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+const [recordingSeconds, setRecordingSeconds] = useState(0);
+const [mentionQuery, setMentionQuery] = useState(null);
+
+const [adminTargetSpInput, setAdminTargetSpInput] = useState('');
+const [adminMemberSearchTerm, setAdminMemberSearchTerm] = useState('');
+const [showAdminScanner, setShowAdminScanner] = useState(false);
+const [shareAuditLogs, setShareAuditLogs] = useState([
+{
+id: 'trk-seed-1',
+trackingId: 'TRK-BCH891',
+senderName: 'Godfather Jay',
+targetName: 'Community Passcard',
+channel: 'Direct Copy',
+clicks: 14,
+timestamp: Date.now() - 86400000,
+},
+]);
+
+const [showQrModal, setShowQrModal] = useState(false);
+const [showSanctionModal, setShowSanctionModal] = useState(null);
+const [sanctionReason, setSanctionReason] = useState('');
+
+const wallPhotoInputRef = useRef(null);
+const wallVideoInputRef = useRef(null);
+const avatarInputRef = useRef(null);
+const mediaRecorderRef = useRef(null);
+const audioChunksRef = useRef([]);
+const recordingTimerRef = useRef(null);
+const scannerVideoRef = useRef(null);
+const scannerStreamRef = useRef(null);
+
+const myProfile = profiles[currentUserId] || profiles['user-jay-001'];
+const targetProfile = profiles[selectedProfileId] || myProfile;
+const isMyProfile = selectedProfileId === currentUserId;
+const isCurrentUserAdmin = Boolean(myProfile.isAdmin || ADMIN_USER_IDS.includes(currentUserId));
+
+const triggerNotification = (message, isError = false) => {
+setNotification({ message, isError });
+setTimeout(() => {
+setNotification(null);
+}, 3200);
+};
+
+const handleStartAudioRecord = async () => {
+try {
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+triggerNotification('Microphone recording not supported on this browser.', true);
+return;
+}
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+const recorder = new MediaRecorder(stream);
+mediaRecorderRef.current = recorder;
+audioChunksRef.current = [];
+
+  recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) {
       audioChunksRef.current.push(e.data);
     }
@@ -47,7 +358,24 @@ const UserIcon = ({ className = "w-6 h-6" }) => ();const FeedIcon = ({ className
   console.error(err);
   triggerNotification('Could not access microphone.', true);
 }
-};const handleStopAudioRecord = () => {if (mediaRecorderRef.current && isRecordingAudio) {mediaRecorderRef.current.stop();setIsRecordingAudio(false);clearInterval(recordingTimerRef.current);triggerNotification('Voice note attached.');}};const handleWallTextChange = (e) => {const val = e.target.value;setWallText(val);const cursor = e.target.selectionStart;
+
+
+};
+
+const handleStopAudioRecord = () => {
+if (mediaRecorderRef.current && isRecordingAudio) {
+mediaRecorderRef.current.stop();
+setIsRecordingAudio(false);
+clearInterval(recordingTimerRef.current);
+triggerNotification('Voice note attached.');
+}
+};
+
+const handleWallTextChange = (e) => {
+const val = e.target.value;
+setWallText(val);
+
+const cursor = e.target.selectionStart;
 const textUpToCursor = val.slice(0, cursor);
 const lastAtIndex = textUpToCursor.lastIndexOf('@');
 
@@ -59,7 +387,52 @@ if (lastAtIndex !== -1) {
   }
 }
 setMentionQuery(null);
-};const handleSelectMention = (username) => {const lastAtIndex = wallText.lastIndexOf('@');if (lastAtIndex === -1) return;const prefix = wallText.slice(0, lastAtIndex);const updated = ${prefix}@${username} ;setWallText(updated);setMentionQuery(null);};const startAdminCameraScanner = async () => {setShowAdminScanner(true);try {if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {const stream = await navigator.mediaDevices.getUserMedia({video: { facingMode: 'environment' },});scannerStreamRef.current = stream;if (scannerVideoRef.current) {scannerVideoRef.current.srcObject = stream;}}} catch (err) {console.warn('Camera inaccessible; manual scan available.', err);}};const stopAdminCameraScanner = () => {if (scannerStreamRef.current) {scannerStreamRef.current.getTracks().forEach((t) => t.stop());scannerStreamRef.current = null;}setShowAdminScanner(false);};const handleGiveSP = (target) => {if (target.userId === currentUserId) return;if (myProfile.earnedSP < 1) {triggerNotification('You have 0 daily SP left to give. Refresh tomorrow!', true);return;}const isGodParent = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus).name === 'God Mother / God Father';
+
+
+};
+
+const handleSelectMention = (username) => {
+const lastAtIndex = wallText.lastIndexOf('@');
+if (lastAtIndex === -1) return;
+const prefix = wallText.slice(0, lastAtIndex);
+const updated = ${prefix}@${username} ;
+setWallText(updated);
+setMentionQuery(null);
+};
+
+const startAdminCameraScanner = async () => {
+setShowAdminScanner(true);
+try {
+if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+const stream = await navigator.mediaDevices.getUserMedia({
+video: { facingMode: 'environment' },
+});
+scannerStreamRef.current = stream;
+if (scannerVideoRef.current) {
+scannerVideoRef.current.srcObject = stream;
+}
+}
+} catch (err) {
+console.warn('Camera inaccessible; manual scan available.', err);
+}
+};
+
+const stopAdminCameraScanner = () => {
+if (scannerStreamRef.current) {
+scannerStreamRef.current.getTracks().forEach((t) => t.stop());
+scannerStreamRef.current = null;
+}
+setShowAdminScanner(false);
+};
+
+const handleGiveSP = (target) => {
+if (target.userId === currentUserId) return;
+if (myProfile.earnedSP < 1) {
+triggerNotification('You have 0 daily SP left to give. Refresh tomorrow!', true);
+return;
+}
+
+const isGodParent = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus).name === 'God Mother / God Father';
 const spAward = isGodParent ? 10 : 1;
 
 setProfiles((prev) => {
@@ -101,7 +474,25 @@ setFeedLogs((prev) => [
 ]);
 
 triggerNotification(`Vouched for ${target.username} (+${spAward} SP)!`);
-};const handleOpenSanction = (action) => {setShowSanctionModal({ targetId: targetProfile.userId, action });setSanctionReason('');};const handleSubmitSanction = (e) => {e.preventDefault();if (!sanctionReason.trim()) {triggerNotification('Please state a reason for the community record.', true);return;}const { action, targetId } = showSanctionModal;const target = profiles[targetId];if (action === 'revoke') {
+
+
+};
+
+const handleOpenSanction = (action) => {
+setShowSanctionModal({ targetId: targetProfile.userId, action });
+setSanctionReason('');
+};
+
+const handleSubmitSanction = (e) => {
+e.preventDefault();
+if (!sanctionReason.trim()) {
+triggerNotification('Please state a reason for the community record.', true);
+return;
+}
+const { action, targetId } = showSanctionModal;
+const target = profiles[targetId];
+
+if (action === 'revoke') {
   setProfiles((prev) => ({
     ...prev,
     [targetId]: {
@@ -149,7 +540,16 @@ triggerNotification(`Vouched for ${target.username} (+${spAward} SP)!`);
 }
 
 setShowSanctionModal(null);
-};const handleGenerateShare = (label = 'Community Passcard', targetId = null) => {const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();const trackingId = TRK-${randomHex};const shareUrl = https://theblackcard.app/passcard?ref=${trackingId}&user=${targetId || currentUserId};const newLog = {
+
+
+};
+
+const handleGenerateShare = (label = 'Community Passcard', targetId = null) => {
+const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+const trackingId = TRK-${randomHex};
+const shareUrl = https://theblackcard.app/passcard?ref=${trackingId}&user=${targetId || currentUserId};
+
+const newLog = {
   id: `trk-${Date.now()}`,
   trackingId,
   senderName: myProfile.username,
@@ -176,7 +576,18 @@ try {
 } catch {
   triggerNotification(`Generated Tracking ID: ${trackingId}`);
 }
-};const handleToggleAdminRole = (target) => {if (!isCurrentUserAdmin) return;if (target.userId === currentUserId && target.isAdmin) {triggerNotification('You cannot demote yourself from Admin status.', true);return;}const nextAdminState = !target.isAdmin;
+
+
+};
+
+const handleToggleAdminRole = (target) => {
+if (!isCurrentUserAdmin) return;
+if (target.userId === currentUserId && target.isAdmin) {
+triggerNotification('You cannot demote yourself from Admin status.', true);
+return;
+}
+
+const nextAdminState = !target.isAdmin;
 setProfiles((prev) => ({
   ...prev,
   [target.userId]: {
@@ -188,7 +599,57 @@ setProfiles((prev) => ({
 triggerNotification(
   `${nextAdminState ? 'Promoted' : 'Demoted'} ${target.username} ${nextAdminState ? 'to Council Admin' : 'to standard member'}.`
 );
-};const handleAdminAdjustSp = (amount) => {if (!isCurrentUserAdmin) return;setProfiles((prev) => {const target = prev[selectedProfileId];const newSp = Math.max(0, target.socialProof + amount);return {...prev,[selectedProfileId]: {...target,socialProof: newSp,blackCardStatus: newSp >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== 'revoked' ? 'active' : target.blackCardStatus,},};});triggerNotification(Adjusted SP by ${amount > 0 ? +${amount} : amount}.);};const handleAdminSetSp = () => {if (!isCurrentUserAdmin) return;const num = parseInt(adminTargetSpInput, 10);if (isNaN(num) || num < 0) {triggerNotification('Enter a valid non-negative number.', true);return;}setProfiles((prev) => {const target = prev[selectedProfileId];return {...prev,[selectedProfileId]: {...target,socialProof: num,blackCardStatus: num >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== 'revoked' ? 'active' : target.blackCardStatus,},};});setAdminTargetSpInput('');triggerNotification(Set ${targetProfile.username}'s SP to ${num}.);};const handlePublishWallPost = (e) => {e.preventDefault();if (!wallText.trim() && !attachedImage && !attachedVideo && !attachedAudio) {triggerNotification('Write a message or attach media first.', true);return;}const newPost = {
+
+
+};
+
+const handleAdminAdjustSp = (amount) => {
+if (!isCurrentUserAdmin) return;
+setProfiles((prev) => {
+const target = prev[selectedProfileId];
+const newSp = Math.max(0, target.socialProof + amount);
+return {
+...prev,
+[selectedProfileId]: {
+...target,
+socialProof: newSp,
+blackCardStatus: newSp >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== 'revoked' ? 'active' : target.blackCardStatus,
+},
+};
+});
+triggerNotification(Adjusted SP by ${amount > 0 ? +${amount} : amount}.);
+};
+
+const handleAdminSetSp = () => {
+if (!isCurrentUserAdmin) return;
+const num = parseInt(adminTargetSpInput, 10);
+if (isNaN(num) || num < 0) {
+triggerNotification('Enter a valid non-negative number.', true);
+return;
+}
+setProfiles((prev) => {
+const target = prev[selectedProfileId];
+return {
+...prev,
+[selectedProfileId]: {
+...target,
+socialProof: num,
+blackCardStatus: num >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== 'revoked' ? 'active' : target.blackCardStatus,
+},
+};
+});
+setAdminTargetSpInput('');
+triggerNotification(Set ${targetProfile.username}'s SP to ${num}.);
+};
+
+const handlePublishWallPost = (e) => {
+e.preventDefault();
+if (!wallText.trim() && !attachedImage && !attachedVideo && !attachedAudio) {
+triggerNotification('Write a message or attach media first.', true);
+return;
+}
+
+const newPost = {
   id: `wall-${Date.now()}`,
   type: 'wall_post',
   authorId: currentUserId,
@@ -206,7 +667,43 @@ setAttachedImage(null);
 setAttachedVideo(null);
 setAttachedAudio(null);
 triggerNotification('Posted to the Community Wall!');
-};const filteredDirectory = useMemo(() => {return Object.values(profiles).filter((p) => {const q = directoryFilter.toLowerCase();return p.username.toLowerCase().includes(q) || p.userId.toLowerCase().includes(q);});}, [profiles, directoryFilter]);const filteredBanned = useMemo(() => {return Object.values(profiles).filter((p) => {if (bannedFilter === 'revoked') return p.blackCardStatus === 'revoked';if (bannedFilter === 'suspended') return p.blackCardStatus === 'suspended';return p.blackCardStatus === 'revoked' || p.blackCardStatus === 'suspended';});}, [profiles, bannedFilter]);const targetTier = getTierInfo(targetProfile.socialProof, targetProfile.blackCardStatus);const myTier = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus);const bgClass = theme === 'dark' ? 'bg-[#000000] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#000000]';const cardClass = theme === 'dark' ? 'bg-[#18181B] text-[#FFFFFF]' : 'bg-[#F4F4F5] text-[#000000]';const inputClass = theme === 'dark' ? 'bg-[#000000] text-[#FFFFFF]' : 'bg-[#E4E4E7] text-[#000000]';if (!isAuthenticated) {return (<div className={min-h-screen flex items-center justify-center p-4 ${bgClass}}><div className={w-full max-w-sm p-6 rounded-3xl ${cardClass} flex flex-col items-center text-center space-y-5}>The Black CardHeritage & Lineage • Verification Gateway      {authStep === 'input' ? (
+
+
+};
+
+const filteredDirectory = useMemo(() => {
+return Object.values(profiles).filter((p) => {
+const q = directoryFilter.toLowerCase();
+return p.username.toLowerCase().includes(q) || p.userId.toLowerCase().includes(q);
+});
+}, [profiles, directoryFilter]);
+
+const filteredBanned = useMemo(() => {
+return Object.values(profiles).filter((p) => {
+if (bannedFilter === 'revoked') return p.blackCardStatus === 'revoked';
+if (bannedFilter === 'suspended') return p.blackCardStatus === 'suspended';
+return p.blackCardStatus === 'revoked' || p.blackCardStatus === 'suspended';
+});
+}, [profiles, bannedFilter]);
+
+const targetTier = getTierInfo(targetProfile.socialProof, targetProfile.blackCardStatus);
+const myTier = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus);
+
+const bgClass = theme === 'dark' ? 'bg-[#000000] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#000000]';
+const cardClass = theme === 'dark' ? 'bg-[#18181B] text-[#FFFFFF]' : 'bg-[#F4F4F5] text-[#000000]';
+const inputClass = theme === 'dark' ? 'bg-[#000000] text-[#FFFFFF]' : 'bg-[#E4E4E7] text-[#000000]';
+
+if (!isAuthenticated) {
+return (
+<div className={min-h-screen flex items-center justify-center p-4 ${bgClass}}>
+<div className={w-full max-w-sm p-6 rounded-3xl ${cardClass} flex flex-col items-center text-center space-y-5}>
+
+
+The Black Card
+Heritage & Lineage • Verification Gateway
+
+
+      {authStep === 'input' ? (
         <div className="w-full space-y-4">
           <div className="flex rounded-2xl bg-[#000000] p-1">
             <button
@@ -293,7 +790,21 @@ triggerNotification('Posted to the Community Wall!');
     </div>
   </div>
 );
-}return (<div className={min-h-screen ${bgClass} pb-24 font-sans}>{notification && (<divclassName={fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3.5 rounded-2xl text-xs font-black uppercase text-center shadow-2xl ${ notification.isError ? 'bg-[#B91C1C] text-[#FFFFFF]' : 'bg-[#007A3D] text-[#FFFFFF]' }}>{notification.message})}  <header className={`sticky top-0 z-40 px-4 py-3 ${theme === 'dark' ? 'bg-[#000000]' : 'bg-[#FFFFFF]'}`}>
+
+
+}
+
+return (
+<div className={min-h-screen ${bgClass} pb-24 font-sans}>
+{notification && (
+<div
+className={fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3.5 rounded-2xl text-xs font-black uppercase text-center shadow-2xl ${ notification.isError ? 'bg-[#B91C1C] text-[#FFFFFF]' : 'bg-[#007A3D] text-[#FFFFFF]' }}
+>
+{notification.message}
+
+)}
+
+  <header className={`sticky top-0 z-40 px-4 py-3 ${theme === 'dark' ? 'bg-[#000000]' : 'bg-[#FFFFFF]'}`}>
     <div className="max-w-md mx-auto flex items-center justify-between">
       <div
         className="flex items-center space-x-2.5 cursor-pointer"
@@ -1169,4 +1680,7 @@ triggerNotification('Posted to the Community Wall!');
     </button>
   </nav>
 </div>
-);}
+
+
+);
+}
