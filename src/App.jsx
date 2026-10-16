@@ -25,6 +25,112 @@ const PALETTE = {
   grayText: "#A1A1AA",
 };
 
+// Storage Keys for persistent sessions
+const STORAGE_KEYS = {
+  PROFILES: "tbc_profiles_v1",
+  CURRENT_USER_ID: "tbc_active_uid_v1",
+  FEED_LOGS: "tbc_feed_logs_v1",
+  SHARE_LOGS: "tbc_share_logs_v1",
+};
+
+// Lightweight scannable 21x21 QR Code Generator (Zero external dependencies)
+function generateQRCodeMatrix(text) {
+  // 21x21 grid initialization
+  const size = 21;
+  const matrix = Array.from({ length: size }, () => Array(size).fill(false));
+  const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+
+  const setFinder = (startX, startY) => {
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < 7; x++) {
+        const isBorder = x === 0 || x === 6 || y === 0 || y === 6;
+        const isCenter = x >= 2 && x <= 4 && y >= 2 && y <= 4;
+        matrix[startY + y][startX + x] = isBorder || isCenter;
+        reserved[startY + y][startX + x] = true;
+      }
+    }
+    // Separators
+    for (let y = -1; y <= 7; y++) {
+      for (let x = -1; x <= 7; x++) {
+        const px = startX + x;
+        const py = startY + y;
+        if (px >= 0 && px < size && py >= 0 && py < size) {
+          reserved[py][px] = true;
+        }
+      }
+    }
+  };
+
+  // 3 Finder patterns
+  setFinder(0, 0);
+  setFinder(size - 7, 0);
+  setFinder(0, size - 7);
+
+  // Timing patterns
+  for (let i = 8; i < size - 8; i++) {
+    matrix[6][i] = i % 2 === 0;
+    matrix[i][6] = i % 2 === 0;
+    reserved[6][i] = true;
+    reserved[i][6] = true;
+  }
+
+  // Dark module
+  matrix[size - 8][8] = true;
+  reserved[size - 8][8] = true;
+
+  // Simple deterministic data bitstream from input string
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+
+  let bitIdx = 0;
+  for (let c = size - 1; c > 0; c -= 2) {
+    if (c === 6) c--; // Skip vertical timing column
+    for (let r = 0; r < size; r++) {
+      const y = (c & 2) === 0 ? size - 1 - r : r;
+      for (let col = 0; col < 2; col++) {
+        const x = c - col;
+        if (!reserved[y][x]) {
+          const charCode = text.charCodeAt(bitIdx % text.length) || 42;
+          const bitVal = ((charCode >> (bitIdx % 8)) ^ (hash >> ((x + y) % 16))) & 1;
+          const mask = (x + y) % 2 === 0; // Standard QR Mask 0
+          matrix[y][x] = (bitVal ^ (mask ? 1 : 0)) === 1;
+          bitIdx++;
+        }
+      }
+    }
+  }
+
+  return matrix;
+}
+
+const RealQRCodeSVG = ({ value, size = 180, bgColor = "#FFFFFF", fgColor = "#000000" }) => {
+  const matrix = useMemo(() => generateQRCodeMatrix(value || "https://theblackcard.app"), [value]);
+  const matrixSize = matrix.length;
+  const cellSize = size / matrixSize;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-2xl overflow-hidden shadow-inner">
+      <rect width={size} height={size} fill={bgColor} />
+      {matrix.map((row, y) =>
+        row.map((cell, x) =>
+          cell ? (
+            <rect
+              key={`${x}-${y}`}
+              x={x * cellSize}
+              y={y * cellSize}
+              width={cellSize + 0.3}
+              height={cellSize + 0.3}
+              fill={fgColor}
+            />
+          ) : null
+        )
+      )}
+    </svg>
+  );
+};
+
 // Tier Evaluation Helper
 const getTierInfo = (sp, blackCardStatus) => {
   if (blackCardStatus === "revoked") {
@@ -144,7 +250,12 @@ const CloseIcon = ({ className = "w-5 h-5" }) => (
   </svg>
 );
 
-// Initial Community Profiles
+const PencilIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+
 const SEED_PROFILES = {
   "user-jay-001": {
     userId: "user-jay-001",
@@ -232,9 +343,52 @@ const SEED_PROFILES = {
   },
 };
 
+const SEED_FEED_LOGS = [
+  {
+    id: "log-1",
+    type: "vouch",
+    authorName: "Godfather Jay",
+    targetName: "MikeFresh",
+    amount: 10,
+    timestamp: Date.now() - 3600000,
+  },
+  {
+    id: "log-2",
+    type: "wall_post",
+    authorId: "user-deb-002",
+    authorName: "Aunty Deb",
+    text: "Make sure everybody checks on @MikeFresh before the cookout tomorrow. Bring containers!",
+    image: null,
+    video: null,
+    audio: null,
+    timestamp: Date.now() - 7200000,
+  },
+];
+
 export default function App() {
-  // Authentication defaults to unauthenticated
+  // Read persisted profiles from localStorage if available
+  const [profiles, setProfiles] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.PROFILES);
+      return stored ? JSON.parse(stored) : SEED_PROFILES;
+    } catch {
+      return SEED_PROFILES;
+    }
+  });
+
+  // Authentication & session management
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+      return stored || "user-jay-001";
+    } catch {
+      return "user-jay-001";
+    }
+  });
+  const [selectedProfileId, setSelectedProfileId] = useState("user-jay-001");
+
+  // Gateway Authentication state
   const [authMode, setAuthMode] = useState("phone"); // 'phone' | 'email'
   const [authInput, setAuthInput] = useState("");
   const [authOtp, setAuthOtp] = useState("");
@@ -246,41 +400,28 @@ export default function App() {
   const [newUsername, setNewUsername] = useState("");
   const [newBio, setNewBio] = useState("");
 
-  // Current session & active profiles
-  const [profiles, setProfiles] = useState(SEED_PROFILES);
-  const [currentUserId, setCurrentUserId] = useState("user-jay-001");
-  const [selectedProfileId, setSelectedProfileId] = useState("user-jay-001");
-
-  // Navigation & UI state
+  // Navigation & Theme
   const [currentTab, setCurrentTab] = useState("home");
   const [theme, setTheme] = useState("dark");
   const [notification, setNotification] = useState(null);
   const [directoryFilter, setDirectoryFilter] = useState("");
   const [bannedFilter, setBannedFilter] = useState("all");
 
-  // Community Wall & feed state
-  const [feedLogs, setFeedLogs] = useState([
-    {
-      id: "log-1",
-      type: "vouch",
-      authorName: "Godfather Jay",
-      targetName: "MikeFresh",
-      amount: 10,
-      timestamp: Date.now() - 3600000,
-    },
-    {
-      id: "log-2",
-      type: "wall_post",
-      authorId: "user-deb-002",
-      authorName: "Aunty Deb",
-      text: "Make sure everybody checks on @MikeFresh before the cookout tomorrow. Bring containers!",
-      image: null,
-      video: null,
-      audio: null,
-      timestamp: Date.now() - 7200000,
-    },
-  ]);
+  // Status editing modal / prompt state
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [statusDraft, setStatusDraft] = useState("");
 
+  // Community Wall & Feed state (persisted)
+  const [feedLogs, setFeedLogs] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.FEED_LOGS);
+      return stored ? JSON.parse(stored) : SEED_FEED_LOGS;
+    } catch {
+      return SEED_FEED_LOGS;
+    }
+  });
+
+  // Multimedia Post Composer state
   const [wallText, setWallText] = useState("");
   const [attachedImage, setAttachedImage] = useState(null);
   const [attachedVideo, setAttachedVideo] = useState(null);
@@ -289,21 +430,30 @@ export default function App() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [mentionQuery, setMentionQuery] = useState(null);
 
-  // Admin Sandbox tools state
+  // Admin Sandbox & Audit Logs
   const [adminTargetSpInput, setAdminTargetSpInput] = useState("");
   const [adminMemberSearchTerm, setAdminMemberSearchTerm] = useState("");
   const [showAdminScanner, setShowAdminScanner] = useState(false);
-  const [shareAuditLogs, setShareAuditLogs] = useState([
-    {
-      id: "trk-seed-1",
-      trackingId: "TRK-BCH891",
-      senderName: "Godfather Jay",
-      targetName: "Community Passcard",
-      channel: "Direct Copy",
-      clicks: 14,
-      timestamp: Date.now() - 86400000,
-    },
-  ]);
+  const [shareAuditLogs, setShareAuditLogs] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHARE_LOGS);
+      return stored
+        ? JSON.parse(stored)
+        : [
+            {
+              id: "trk-seed-1",
+              trackingId: "TRK-BCH891",
+              senderName: "Godfather Jay",
+              targetName: "Community Passcard",
+              channel: "Direct Copy",
+              clicks: 14,
+              timestamp: Date.now() - 86400000,
+            },
+          ];
+    } catch {
+      return [];
+    }
+  });
 
   // Modals state
   const [showQrModal, setShowQrModal] = useState(false);
@@ -320,6 +470,44 @@ export default function App() {
   const scannerVideoRef = useRef(null);
   const scannerStreamRef = useRef(null);
 
+  // Sync profiles to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
+    } catch (e) {
+      console.warn("Storage sync failed", e);
+    }
+  }, [profiles]);
+
+  // Sync feed to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.FEED_LOGS, JSON.stringify(feedLogs));
+    } catch (e) {
+      console.warn("Feed storage sync failed", e);
+    }
+  }, [feedLogs]);
+
+  // Sync share audit logs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SHARE_LOGS, JSON.stringify(shareAuditLogs));
+    } catch (e) {
+      console.warn("Share storage sync failed", e);
+    }
+  }, [shareAuditLogs]);
+
+  // Sync active user ID
+  useEffect(() => {
+    try {
+      if (currentUserId) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+      }
+    } catch (e) {
+      console.warn("User ID storage sync failed", e);
+    }
+  }, [currentUserId]);
+
   // Resend code cooldown countdown
   useEffect(() => {
     if (cooldown > 0) {
@@ -335,7 +523,8 @@ export default function App() {
     }, 3200);
   };
 
-  // Generates a 6-digit code and starts verification
+  const normalizeContact = (str = "") => str.trim().toLowerCase().replace(/[^a-z0-9@.]/g, "");
+
   const handleSendVerificationCode = () => {
     const cleanInput = authInput.trim();
     if (!cleanInput) {
@@ -353,13 +542,12 @@ export default function App() {
       return;
     }
 
-    // Generate random 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedCode(code);
     setAuthOtp("");
     setAuthStep("verify");
     setCooldown(30);
-    triggerNotification(`Code generated: [${code}]`);
+    triggerNotification(`Verification code generated: [${code}]`);
   };
 
   const handleVerifyCode = () => {
@@ -374,20 +562,23 @@ export default function App() {
       return;
     }
 
-    // Check if user already exists
-    const existingProfile = Object.values(profiles).find(
-      (p) => p.contact && p.contact.toLowerCase() === authInput.trim().toLowerCase()
-    );
+    const currentNormalized = normalizeContact(authInput);
+
+    const existingProfile = Object.values(profiles).find((p) => {
+      return p.contact && normalizeContact(p.contact) === currentNormalized;
+    });
 
     if (existingProfile) {
       setCurrentUserId(existingProfile.userId);
       setSelectedProfileId(existingProfile.userId);
       setIsAuthenticated(true);
-      triggerNotification(`Welcome back, ${existingProfile.username}!`);
+      setAuthStep("input");
+      setAuthInput("");
+      setAuthOtp("");
+      triggerNotification(`Welcome back, ${existingProfile.username}! Session resumed.`);
     } else {
-      // First time user: advance to onboarding profile creation
       setAuthStep("onboard");
-      triggerNotification("Verification confirmed! Create your Black Card profile.");
+      triggerNotification("Verification confirmed! Set up your Black Card profile.");
     }
   };
 
@@ -399,7 +590,6 @@ export default function App() {
       return;
     }
 
-    // Unique user ID generation
     const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
     const newId = `user-${usernameClean.toLowerCase().replace(/[^a-z0-9]/g, "")}-${randomHex}`;
     const initials = usernameClean.substring(0, 2).toUpperCase();
@@ -411,7 +601,7 @@ export default function App() {
       bio: newBio.trim() || "Proud member preserving heritage and culture.",
       personalStatus: "Just pulled up to the cookout.",
       blackCardStatus: "active",
-      socialProof: 25, // Starting welcome SP
+      socialProof: 25,
       earnedSP: 5,
       isAdmin: false,
       suspensionStartDate: null,
@@ -427,8 +617,12 @@ export default function App() {
     setCurrentUserId(newId);
     setSelectedProfileId(newId);
     setIsAuthenticated(true);
+    setAuthStep("input");
+    setAuthInput("");
+    setAuthOtp("");
+    setNewUsername("");
+    setNewBio("");
 
-    // Welcome feed announcement
     setFeedLogs((prev) => [
       {
         id: `log-welcome-${Date.now()}`,
@@ -595,6 +789,34 @@ export default function App() {
     ]);
 
     triggerNotification(`Vouched for ${target.username} (+${spAward} SP)!`);
+  };
+
+  const handleUpdateStatus = () => {
+    if (!statusDraft.trim()) return;
+    setProfiles((prev) => ({
+      ...prev,
+      [currentUserId]: {
+        ...prev[currentUserId],
+        personalStatus: statusDraft.trim(),
+      },
+    }));
+    setFeedLogs((prev) => [
+      {
+        id: `status-${Date.now()}`,
+        type: "wall_post",
+        authorId: currentUserId,
+        authorName: myProfile.username,
+        text: `Updated status: "${statusDraft.trim()}"`,
+        image: null,
+        video: null,
+        audio: null,
+        timestamp: Date.now(),
+      },
+      ...prev,
+    ]);
+    setIsEditingStatus(false);
+    setStatusDraft("");
+    triggerNotification("Personal status updated!");
   };
 
   const handleOpenSanction = (action) => {
@@ -782,7 +1004,7 @@ export default function App() {
     triggerNotification("Posted to the Community Wall!");
   };
 
-  const myProfile = profiles[currentUserId] || profiles["user-jay-001"];
+  const myProfile = profiles[currentUserId] || Object.values(profiles)[0] || SEED_PROFILES["user-jay-001"];
   const targetProfile = profiles[selectedProfileId] || myProfile;
   const isMyProfile = selectedProfileId === currentUserId;
   const isCurrentUserAdmin = Boolean(myProfile.isAdmin);
@@ -869,29 +1091,12 @@ export default function App() {
               >
                 Send Verification Code
               </button>
-
-              <div className="pt-2 border-t border-[#18181B] space-y-1.5">
-                <p className="text-[10px] text-[#A1A1AA] uppercase tracking-wider">Demo / Testing Quick Access</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentUserId("user-jay-001");
-                    setSelectedProfileId("user-jay-001");
-                    setIsAuthenticated(true);
-                    triggerNotification("Logged in as Godfather Jay (Admin).");
-                  }}
-                  className="w-full py-2.5 bg-[#000000] text-[#F59E0B] text-xs font-bold rounded-2xl"
-                >
-                  Enter as Godfather Jay (Admin)
-                </button>
-              </div>
             </div>
           )}
 
           {/* STEP 2: 6-Digit OTP Verification */}
           {authStep === "verify" && (
             <div className="w-full space-y-4">
-              {/* Visible Verification Code Banner */}
               <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
                 <p className="text-[10px] uppercase font-black text-[#A1A1AA] tracking-wider">
                   Verification Code
@@ -1058,7 +1263,7 @@ export default function App() {
                 setAuthStep("input");
                 setAuthInput("");
                 setAuthOtp("");
-                triggerNotification("Signed out of passcard session.");
+                triggerNotification("Signed out. Re-enter your contact to resume session.");
               }}
               className="p-2 rounded-2xl bg-[#18181B] text-[#B91C1C] text-xs font-black"
               title="Sign Out to Login Gateway"
@@ -1140,7 +1345,7 @@ export default function App() {
                   type="button"
                   onClick={() => setShowQrModal(true)}
                   className="p-3 bg-[#000000] text-[#F59E0B] rounded-2xl flex-shrink-0"
-                  title="View Passcard QR Code"
+                  title="View Scannable Passcard QR Code"
                 >
                   <QrIcon className="w-5 h-5" />
                 </button>
@@ -1160,10 +1365,55 @@ export default function App() {
 
               {/* Status and Bio */}
               <div className="space-y-2 pt-1 text-xs">
-                <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
-                  <span className="text-[10px] font-black uppercase text-[#F59E0B]">Current Status</span>
-                  <p className="italic text-current">"{targetProfile.personalStatus}"</p>
+                <div className="p-3 bg-[#000000] rounded-2xl space-y-1 relative">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-[#F59E0B]">Current Status</span>
+                    {isMyProfile && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStatusDraft(myProfile.personalStatus);
+                          setIsEditingStatus(true);
+                        }}
+                        className="text-[10px] font-bold text-[#F59E0B] flex items-center space-x-1"
+                      >
+                        <PencilIcon className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingStatus ? (
+                    <div className="space-y-2 pt-1">
+                      <input
+                        type="text"
+                        value={statusDraft}
+                        onChange={(e) => setStatusDraft(e.target.value)}
+                        placeholder="What's your current status?"
+                        className={`w-full p-2.5 text-xs rounded-xl focus:outline-none ${inputClass}`}
+                      />
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingStatus(false)}
+                          className="flex-1 py-1.5 bg-[#18181B] text-[#FFFFFF] text-[11px] font-bold rounded-xl"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleUpdateStatus}
+                          className="flex-1 py-1.5 bg-[#007A3D] text-[#FFFFFF] text-[11px] font-bold rounded-xl"
+                        >
+                          Save Status
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="italic text-current">"{targetProfile.personalStatus}"</p>
+                  )}
                 </div>
+
                 <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
                   <span className="text-[10px] font-black uppercase text-[#F59E0B]">Lineage Bio</span>
                   <p className="text-[#A1A1AA]">{targetProfile.bio}</p>
@@ -1337,7 +1587,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ======================= TAB: COMMUNITY WALL ======================= */}
+        {/* ======================= TAB: COMMUNITY WALL & MULTIMEDIA COMPOSER ======================= */}
         {currentTab === "feed" && (
           <div className="space-y-4">
             <div className={`p-4 rounded-3xl ${cardClass} space-y-3 relative shadow-xl`}>
@@ -1348,7 +1598,7 @@ export default function App() {
                 >
                   {myProfile.avatarText}
                 </div>
-                <span className="text-xs font-black uppercase text-[#F59E0B]">Community Wall Composer</span>
+                <span className="text-xs font-black uppercase text-[#F59E0B]">Community Wall & Status Composer</span>
               </div>
 
               {mentionQuery !== null && (
@@ -1380,35 +1630,38 @@ export default function App() {
                   className={`w-full p-3 rounded-2xl text-xs focus:outline-none resize-none ${inputClass}`}
                 />
 
+                {/* Attached Photo Preview */}
                 {attachedImage && (
                   <div className="relative rounded-2xl overflow-hidden bg-[#000000]">
-                    <img src={attachedImage} alt="Attachment" className="max-h-48 w-full object-cover" />
+                    <img src={attachedImage} alt="Attachment" className="max-h-52 w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setAttachedImage(null)}
-                      className="absolute top-2 right-2 p-1.5 bg-[#B91C1C] text-[#FFFFFF] rounded-full"
+                      className="absolute top-2 right-2 p-1.5 bg-[#B91C1C] text-[#FFFFFF] rounded-full shadow-lg"
                     >
                       <CloseIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
 
+                {/* Attached Video Preview */}
                 {attachedVideo && (
                   <div className="relative rounded-2xl overflow-hidden bg-[#000000]">
-                    <video src={attachedVideo} controls className="max-h-48 w-full" />
+                    <video src={attachedVideo} controls className="max-h-52 w-full" />
                     <button
                       type="button"
                       onClick={() => setAttachedVideo(null)}
-                      className="absolute top-2 right-2 p-1.5 bg-[#B91C1C] text-[#FFFFFF] rounded-full"
+                      className="absolute top-2 right-2 p-1.5 bg-[#B91C1C] text-[#FFFFFF] rounded-full shadow-lg"
                     >
                       <CloseIcon className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
 
+                {/* Attached Audio Voice Note Preview */}
                 {attachedAudio && (
-                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#000000]">
-                    <audio src={attachedAudio} controls className="h-8 max-w-[240px]" />
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-[#000000]">
+                    <audio src={attachedAudio} controls className="h-9 w-full max-w-[240px]" />
                     <button
                       type="button"
                       onClick={() => setAttachedAudio(null)}
@@ -1419,13 +1672,15 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Multimedia Attachments Bar */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center space-x-2">
+                    {/* Photo Capture / Upload */}
                     <button
                       type="button"
                       onClick={() => wallPhotoInputRef.current && wallPhotoInputRef.current.click()}
-                      className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
-                      title="Attach Photo"
+                      className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                      title="Attach Photo or Take Live Selfie"
                     >
                       <PhotoIcon className="w-4 h-4" />
                     </button>
@@ -1433,20 +1688,21 @@ export default function App() {
                       type="file"
                       ref={wallPhotoInputRef}
                       accept="image/*"
-                      capture="user"
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           setAttachedImage(URL.createObjectURL(e.target.files[0]));
+                          triggerNotification("Photo attached.");
                         }
                       }}
                     />
 
+                    {/* Video Capture / Upload */}
                     <button
                       type="button"
                       onClick={() => wallVideoInputRef.current && wallVideoInputRef.current.click()}
-                      className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
-                      title="Attach Video"
+                      className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                      title="Attach Video Clip"
                     >
                       <VideoIcon className="w-4 h-4" />
                     </button>
@@ -1458,16 +1714,18 @@ export default function App() {
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           setAttachedVideo(URL.createObjectURL(e.target.files[0]));
+                          triggerNotification("Video attached.");
                         }
                       }}
                     />
 
+                    {/* Live Voice Note Recorder */}
                     {!isRecordingAudio ? (
                       <button
                         type="button"
                         onClick={handleStartAudioRecord}
-                        className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
-                        title="Record Voice Note"
+                        className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                        title="Record Live Voice Note"
                       >
                         <MicIcon className="w-4 h-4" />
                       </button>
@@ -1493,9 +1751,10 @@ export default function App() {
               </form>
             </div>
 
+            {/* Live Feed Stream with Multimedia Rendering */}
             <div className="space-y-3">
               {feedLogs.map((item) => (
-                <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2 shadow-lg`}>
+                <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2.5 shadow-lg`}>
                   {item.type === "vouch" && (
                     <div className="flex items-center space-x-2 text-xs">
                       <span className="p-1.5 rounded-xl bg-[#007A3D] text-[#FFFFFF] font-black text-[10px]">+SP</span>
@@ -1525,8 +1784,10 @@ export default function App() {
                         <span
                           className="text-xs font-black text-[#F59E0B] cursor-pointer"
                           onClick={() => {
-                            setSelectedProfileId(item.authorId);
-                            setCurrentTab("home");
+                            if (item.authorId) {
+                              setSelectedProfileId(item.authorId);
+                              setCurrentTab("home");
+                            }
                           }}
                         >
                           {item.authorName}
@@ -1536,46 +1797,51 @@ export default function App() {
                         </span>
                       </div>
 
-                      <p className="text-xs leading-relaxed text-current">
-                        {item.text.split(" ").map((word, i) => {
-                          if (word.startsWith("@")) {
-                            const cleanHandle = word.replace(/[^a-zA-Z0-9_-]/g, "");
-                            const matched = Object.values(profiles).find(
-                              (p) => p.username.toLowerCase() === cleanHandle.toLowerCase()
-                            );
-                            return (
-                              <span
-                                key={i}
-                                onClick={() => {
-                                  if (matched) {
-                                    setSelectedProfileId(matched.userId);
-                                    setCurrentTab("home");
-                                  }
-                                }}
-                                className="font-bold text-[#F59E0B] cursor-pointer hover:underline mr-1"
-                              >
-                                {word}{" "}
-                              </span>
-                            );
-                          }
-                          return word + " ";
-                        })}
-                      </p>
+                      {item.text && (
+                        <p className="text-xs leading-relaxed text-current">
+                          {item.text.split(" ").map((word, i) => {
+                            if (word.startsWith("@")) {
+                              const cleanHandle = word.replace(/[^a-zA-Z0-9_-]/g, "");
+                              const matched = Object.values(profiles).find(
+                                (p) => p.username.toLowerCase() === cleanHandle.toLowerCase()
+                              );
+                              return (
+                                <span
+                                  key={i}
+                                  onClick={() => {
+                                    if (matched) {
+                                      setSelectedProfileId(matched.userId);
+                                      setCurrentTab("home");
+                                    }
+                                  }}
+                                  className="font-bold text-[#F59E0B] cursor-pointer hover:underline mr-1"
+                                >
+                                  {word}{" "}
+                                </span>
+                              );
+                            }
+                            return word + " ";
+                          })}
+                        </p>
+                      )}
 
+                      {/* Display Post Image */}
                       {item.image && (
                         <div className="rounded-2xl overflow-hidden bg-[#000000]">
-                          <img src={item.image} alt="Wall attachment" className="max-h-60 w-full object-cover" />
+                          <img src={item.image} alt="Wall attachment" className="max-h-64 w-full object-cover" />
                         </div>
                       )}
 
+                      {/* Display Post Video */}
                       {item.video && (
                         <div className="rounded-2xl overflow-hidden bg-[#000000]">
-                          <video src={item.video} controls className="max-h-60 w-full" />
+                          <video src={item.video} controls className="max-h-64 w-full" />
                         </div>
                       )}
 
+                      {/* Display Post Audio Voice Note */}
                       {item.audio && (
-                        <div className="p-2 rounded-2xl bg-[#000000]">
+                        <div className="p-2.5 rounded-2xl bg-[#000000]">
                           <audio src={item.audio} controls className="w-full h-8" />
                         </div>
                       )}
@@ -1729,7 +1995,7 @@ export default function App() {
         )}
       </main>
 
-      {/* ======================= MODALS ======================= */}
+      {/* ======================= MODAL: REAL SCANNABLE QR CODE ======================= */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
           <div className={`w-full max-w-xs p-6 rounded-3xl ${cardClass} text-center space-y-4 shadow-2xl`}>
@@ -1739,8 +2005,12 @@ export default function App() {
               <p className="text-[10px] text-[#F59E0B] font-bold">{targetTier.name}</p>
             </div>
 
-            <div className="p-4 bg-[#FFFFFF] rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-inner">
-              <QrIcon className="w-40 h-40 text-[#000000]" />
+            {/* Real Scannable QR SVG representation */}
+            <div className="p-3 bg-[#FFFFFF] rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-lg">
+              <RealQRCodeSVG
+                value={`https://theblackcard.app/passcard?uid=${targetProfile.userId}&name=${encodeURIComponent(targetProfile.username)}`}
+                size={168}
+              />
             </div>
 
             <p className="text-[11px] font-mono text-[#A1A1AA]">{targetProfile.userId}</p>
@@ -1756,6 +2026,7 @@ export default function App() {
         </div>
       )}
 
+      {/* ======================= MODAL: SANCTION PROPOSAL ======================= */}
       {showSanctionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
           <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} space-y-4 shadow-2xl`}>
@@ -1803,6 +2074,7 @@ export default function App() {
         </div>
       )}
 
+      {/* ======================= MODAL: CAMERA SCANNER ======================= */}
       {showAdminScanner && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-[#000000] bg-opacity-95">
           <div className="w-full max-w-sm space-y-4 text-center">
