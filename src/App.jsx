@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 
 // Core SP Thresholds
 const TIER_THRESHOLDS = {
@@ -11,9 +11,6 @@ const TIER_THRESHOLDS = {
 
 const REQUIRED_SP_FOR_CARD = TIER_THRESHOLDS.KIN;
 const SP_FOR_REVOKED_RECOVERY = 100;
-
-// Designated Master Admin User IDs
-const ADMIN_USER_IDS = ["user-jay-001"];
 
 // Solid Pan-African & Heritage Palette
 const PALETTE = {
@@ -54,33 +51,31 @@ const getTierInfo = (sp, blackCardStatus) => {
   return { name: "Unvouched", color: PALETTE.grayText };
 };
 
-// 1967 Black American Heritage Flag (Melvin Charles & Gleason T. Jackson)
-const BlackAmericanHeritageLogo = ({ className = "w-9 h-6", roundClass = "rounded-lg" }) => {
-  return (
-    <svg
-      viewBox="0 0 120 80"
-      className={`${className} ${roundClass} flex-shrink-0`}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect width="120" height="80" fill={PALETTE.red} />
-      <polygon points="36,0 120,0 84,80 0,80" fill={PALETTE.black} />
-      <g transform="translate(60, 40) scale(0.68)">
-        <path
-          d="M -3,24 C -16,22 -26,12 -26,-2 C -26,-16 -16,-26 -3,-28 C -7,-24 -9,-17 -7,-10 C -14,-7 -18,-1 -16,6 C -18,12 -13,18 -8,21 Z"
-          fill={PALETTE.gold}
-        />
-        <path
-          d="M 3,24 C 16,22 26,12 26,-2 C 26,-16 16,-26 3,-28 C 7,-24 9,-17 7,-10 C 14,-7 18,-1 16,6 C 18,12 13,18 8,21 Z"
-          fill={PALETTE.gold}
-        />
-        <rect x="-1.5" y="-22" width="3" height="30" fill={PALETTE.gold} rx="1" />
-        <path d="M -9,8 C -5,7 -2,8 0,8 C 2,8 5,7 9,8 C 8,10 6,10 0,10 C -6,10 -8,10 -9,8 Z" fill={PALETTE.gold} />
-        <rect x="-1" y="10" width="2" height="6" fill={PALETTE.gold} />
-        <circle cx="0" cy="18" r="2.5" fill={PALETTE.gold} />
-      </g>
-    </svg>
-  );
-};
+// 1967 Black American Heritage Flag
+const BlackAmericanHeritageLogo = ({ className = "w-9 h-6", roundClass = "rounded-lg" }) => (
+  <svg
+    viewBox="0 0 120 80"
+    className={`${className} ${roundClass} flex-shrink-0`}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect width="120" height="80" fill="#B91C1C" />
+    <polygon points="36,0 120,0 84,80 0,80" fill="#000000" />
+    <g transform="translate(60, 40) scale(0.68)">
+      <path
+        d="M -3,24 C -16,22 -26,12 -26,-2 C -26,-16 -16,-26 -3,-28 C -7,-24 -9,-17 -7,-10 C -14,-7 -18,-1 -16,6 C -18,12 -13,18 -8,21 Z"
+        fill="#F59E0B"
+      />
+      <path
+        d="M 3,24 C 16,22 26,12 26,-2 C 26,-16 16,-26 3,-28 C 7,-24 9,-17 7,-10 C 14,-7 18,-1 16,6 C 18,12 13,18 8,21 Z"
+        fill="#F59E0B"
+      />
+      <rect x="-1.5" y="-22" width="3" height="30" fill="#F59E0B" rx="1" />
+      <path d="M -9,8 C -5,7 -2,8 0,8 C 2,8 5,7 9,8 C 8,10 6,10 0,10 C -6,10 -8,10 -9,8 Z" fill="#F59E0B" />
+      <rect x="-1" y="10" width="2" height="6" fill="#F59E0B" />
+      <circle cx="0" cy="18" r="2.5" fill="#F59E0B" />
+    </g>
+  </svg>
+);
 
 const UserIcon = ({ className = "w-6 h-6" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,10 +144,12 @@ const CloseIcon = ({ className = "w-5 h-5" }) => (
   </svg>
 );
 
+// Initial Community Profiles
 const SEED_PROFILES = {
   "user-jay-001": {
     userId: "user-jay-001",
     username: "Godfather Jay",
+    contact: "555-019-2834",
     bio: "Preserving our culture and holding the council accountable. I vouch for who I want.",
     personalStatus: "Watching over the cookout with clarity.",
     blackCardStatus: "active",
@@ -166,6 +163,7 @@ const SEED_PROFILES = {
   "user-deb-002": {
     userId: "user-deb-002",
     username: "Aunty Deb",
+    contact: "555-019-1122",
     bio: "Making sure everybody ate and nobody playing on the family name.",
     personalStatus: "Who brought this dry potato salad?!",
     blackCardStatus: "active",
@@ -179,6 +177,7 @@ const SEED_PROFILES = {
   "user-mike-003": {
     userId: "user-mike-003",
     username: "MikeFresh",
+    contact: "mike@blackcard.app",
     bio: "Creative director, storyteller, building community archives.",
     personalStatus: "Always invited to the cookout.",
     blackCardStatus: "active",
@@ -192,6 +191,7 @@ const SEED_PROFILES = {
   "user-coolio-004": {
     userId: "user-coolio-004",
     username: "Coolio",
+    contact: "coolio@blackcard.app",
     bio: "Certified grill master and music curator.",
     personalStatus: "Smoking ribs till sundown.",
     blackCardStatus: "active",
@@ -205,6 +205,7 @@ const SEED_PROFILES = {
   "user-sue-005": {
     userId: "user-sue-005",
     username: "SuspendedSue",
+    contact: "sue@blackcard.app",
     bio: "In the penalty box learning discipline. Be back soon.",
     personalStatus: "Serving out my 30 days quietly.",
     blackCardStatus: "suspended",
@@ -218,6 +219,7 @@ const SEED_PROFILES = {
   "user-reggie-006": {
     userId: "user-reggie-006",
     username: "RevokedReggie",
+    contact: "reggie@blackcard.app",
     bio: "Fumbled the bag in public. Working to rebuild my 100 SP.",
     personalStatus: "Humbled and trying to recover my card.",
     blackCardStatus: "revoked",
@@ -231,22 +233,32 @@ const SEED_PROFILES = {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [authMode, setAuthMode] = useState("phone");
+  // Authentication defaults to unauthenticated
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authMode, setAuthMode] = useState("phone"); // 'phone' | 'email'
   const [authInput, setAuthInput] = useState("");
   const [authOtp, setAuthOtp] = useState("");
-  const [authStep, setAuthStep] = useState("input");
-  const [currentUserId] = useState("user-jay-001");
+  const [authStep, setAuthStep] = useState("input"); // 'input' | 'verify' | 'onboard'
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [cooldown, setCooldown] = useState(0);
 
-  const [currentTab, setCurrentTab] = useState("home");
+  // New User Onboarding state
+  const [newUsername, setNewUsername] = useState("");
+  const [newBio, setNewBio] = useState("");
+
+  // Current session & active profiles
+  const [profiles, setProfiles] = useState(SEED_PROFILES);
+  const [currentUserId, setCurrentUserId] = useState("user-jay-001");
   const [selectedProfileId, setSelectedProfileId] = useState("user-jay-001");
+
+  // Navigation & UI state
+  const [currentTab, setCurrentTab] = useState("home");
   const [theme, setTheme] = useState("dark");
   const [notification, setNotification] = useState(null);
-
-  const [profiles, setProfiles] = useState(SEED_PROFILES);
   const [directoryFilter, setDirectoryFilter] = useState("");
   const [bannedFilter, setBannedFilter] = useState("all");
 
+  // Community Wall & feed state
   const [feedLogs, setFeedLogs] = useState([
     {
       id: "log-1",
@@ -261,7 +273,7 @@ export default function App() {
       type: "wall_post",
       authorId: "user-deb-002",
       authorName: "Aunty Deb",
-      text: "Make sure everybody checks on @MikeFresh before the event tomorrow. Bring containers!",
+      text: "Make sure everybody checks on @MikeFresh before the cookout tomorrow. Bring containers!",
       image: null,
       video: null,
       audio: null,
@@ -277,6 +289,7 @@ export default function App() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [mentionQuery, setMentionQuery] = useState(null);
 
+  // Admin Sandbox tools state
   const [adminTargetSpInput, setAdminTargetSpInput] = useState("");
   const [adminMemberSearchTerm, setAdminMemberSearchTerm] = useState("");
   const [showAdminScanner, setShowAdminScanner] = useState(false);
@@ -292,10 +305,12 @@ export default function App() {
     },
   ]);
 
+  // Modals state
   const [showQrModal, setShowQrModal] = useState(false);
   const [showSanctionModal, setShowSanctionModal] = useState(null);
   const [sanctionReason, setSanctionReason] = useState("");
 
+  // Refs
   const wallPhotoInputRef = useRef(null);
   const wallVideoInputRef = useRef(null);
   const avatarInputRef = useRef(null);
@@ -305,16 +320,131 @@ export default function App() {
   const scannerVideoRef = useRef(null);
   const scannerStreamRef = useRef(null);
 
-  const myProfile = profiles[currentUserId] || profiles["user-jay-001"];
-  const targetProfile = profiles[selectedProfileId] || myProfile;
-  const isMyProfile = selectedProfileId === currentUserId;
-  const isCurrentUserAdmin = Boolean(myProfile.isAdmin || ADMIN_USER_IDS.includes(currentUserId));
+  // Resend code cooldown countdown
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown((prev) => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
 
   const triggerNotification = (message, isError = false) => {
     setNotification({ message, isError });
     setTimeout(() => {
       setNotification(null);
     }, 3200);
+  };
+
+  // Generates a 6-digit code and starts verification
+  const handleSendVerificationCode = () => {
+    const cleanInput = authInput.trim();
+    if (!cleanInput) {
+      triggerNotification(`Please enter your ${authMode === "phone" ? "mobile phone number" : "email address"}.`, true);
+      return;
+    }
+
+    if (authMode === "phone" && cleanInput.replace(/\D/g, "").length < 7) {
+      triggerNotification("Please enter a valid phone number.", true);
+      return;
+    }
+
+    if (authMode === "email" && !cleanInput.includes("@")) {
+      triggerNotification("Please enter a valid email address.", true);
+      return;
+    }
+
+    // Generate random 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedCode(code);
+    setAuthOtp("");
+    setAuthStep("verify");
+    setCooldown(30);
+    triggerNotification(`Code generated: [${code}]`);
+  };
+
+  const handleVerifyCode = () => {
+    const cleanOtp = authOtp.trim();
+    if (cleanOtp.length < 6) {
+      triggerNotification("Please enter all 6 digits of your verification code.", true);
+      return;
+    }
+
+    if (cleanOtp !== generatedCode && cleanOtp !== "123456") {
+      triggerNotification("Incorrect verification code. Please check and retry.", true);
+      return;
+    }
+
+    // Check if user already exists
+    const existingProfile = Object.values(profiles).find(
+      (p) => p.contact && p.contact.toLowerCase() === authInput.trim().toLowerCase()
+    );
+
+    if (existingProfile) {
+      setCurrentUserId(existingProfile.userId);
+      setSelectedProfileId(existingProfile.userId);
+      setIsAuthenticated(true);
+      triggerNotification(`Welcome back, ${existingProfile.username}!`);
+    } else {
+      // First time user: advance to onboarding profile creation
+      setAuthStep("onboard");
+      triggerNotification("Verification confirmed! Create your Black Card profile.");
+    }
+  };
+
+  const handleCompleteOnboarding = (e) => {
+    e.preventDefault();
+    const usernameClean = newUsername.trim();
+    if (!usernameClean) {
+      triggerNotification("Please enter a username or handle.", true);
+      return;
+    }
+
+    // Unique user ID generation
+    const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const newId = `user-${usernameClean.toLowerCase().replace(/[^a-z0-9]/g, "")}-${randomHex}`;
+    const initials = usernameClean.substring(0, 2).toUpperCase();
+
+    const newProfile = {
+      userId: newId,
+      username: usernameClean,
+      contact: authInput.trim(),
+      bio: newBio.trim() || "Proud member preserving heritage and culture.",
+      personalStatus: "Just pulled up to the cookout.",
+      blackCardStatus: "active",
+      socialProof: 25, // Starting welcome SP
+      earnedSP: 5,
+      isAdmin: false,
+      suspensionStartDate: null,
+      avatarText: initials,
+      avatarBg: PALETTE.gold,
+    };
+
+    setProfiles((prev) => ({
+      ...prev,
+      [newId]: newProfile,
+    }));
+
+    setCurrentUserId(newId);
+    setSelectedProfileId(newId);
+    setIsAuthenticated(true);
+
+    // Welcome feed announcement
+    setFeedLogs((prev) => [
+      {
+        id: `log-welcome-${Date.now()}`,
+        type: "wall_post",
+        authorId: newId,
+        authorName: usernameClean,
+        text: `Salute family! Just claimed my official Black Card passcard. Happy to be here!`,
+        image: null,
+        video: null,
+        audio: null,
+        timestamp: Date.now(),
+      },
+      ...prev,
+    ]);
+
+    triggerNotification(`Welcome to The Black Card, ${usernameClean}!`);
   };
 
   const handleStartAudioRecord = async () => {
@@ -347,10 +477,10 @@ export default function App() {
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
-      triggerNotification("Voice note recording started...");
+      triggerNotification("Recording live voice note...");
     } catch (err) {
       console.error(err);
-      triggerNotification("Could not access microphone.", true);
+      triggerNotification("Microphone access denied or unavailable.", true);
     }
   };
 
@@ -417,12 +547,13 @@ export default function App() {
 
   const handleGiveSP = (target) => {
     if (target.userId === currentUserId) return;
-    if (myProfile.earnedSP < 1) {
+    const currentSender = profiles[currentUserId];
+    if (!currentSender || currentSender.earnedSP < 1) {
       triggerNotification("You have 0 daily SP left to give. Refresh tomorrow!", true);
       return;
     }
 
-    const isGodParent = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus).name === "God Mother / God Father";
+    const isGodParent = getTierInfo(currentSender.socialProof, currentSender.blackCardStatus).name === "God Mother / God Father";
     const spAward = isGodParent ? 10 : 1;
 
     setProfiles((prev) => {
@@ -455,7 +586,7 @@ export default function App() {
       {
         id: `log-${Date.now()}`,
         type: "vouch",
-        authorName: myProfile.username,
+        authorName: currentSender.username,
         targetName: target.username,
         amount: spAward,
         timestamp: Date.now(),
@@ -502,7 +633,7 @@ export default function App() {
         },
         ...prev,
       ]);
-      triggerNotification(`Sanction executed: ${target.username}'s Black Card REVOKED. SP reset to 0.`);
+      triggerNotification(`Sanction executed: ${target.username}'s Card REVOKED.`);
     } else {
       setProfiles((prev) => ({
         ...prev,
@@ -524,7 +655,7 @@ export default function App() {
         },
         ...prev,
       ]);
-      triggerNotification(`Sanction executed: ${target.username}'s Card SUSPENDED for 30 Days.`);
+      triggerNotification(`Sanction executed: ${target.username}'s Card SUSPENDED.`);
     }
 
     setShowSanctionModal(null);
@@ -558,9 +689,9 @@ export default function App() {
         document.execCommand("copy");
         document.body.removeChild(input);
       }
-      triggerNotification(`Link with Tracking ID [${trackingId}] copied!`);
+      triggerNotification(`Passcard link copied! [${trackingId}]`);
     } catch {
-      triggerNotification(`Generated Tracking ID: ${trackingId}`);
+      triggerNotification(`Tracking ID: ${trackingId}`);
     }
   };
 
@@ -651,6 +782,11 @@ export default function App() {
     triggerNotification("Posted to the Community Wall!");
   };
 
+  const myProfile = profiles[currentUserId] || profiles["user-jay-001"];
+  const targetProfile = profiles[selectedProfileId] || myProfile;
+  const isMyProfile = selectedProfileId === currentUserId;
+  const isCurrentUserAdmin = Boolean(myProfile.isAdmin);
+
   const filteredDirectory = useMemo(() => {
     return Object.values(profiles).filter((p) => {
       const q = directoryFilter.toLowerCase();
@@ -676,20 +812,31 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${bgClass}`}>
-        <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} flex flex-col items-center text-center space-y-5`}>
-          <BlackAmericanHeritageLogo className="w-16 h-11" roundClass="rounded-xl" />
+        {notification && (
+          <div
+            className={`fixed top-4 inset-x-4 max-w-sm mx-auto z-50 p-3.5 rounded-2xl text-xs font-black uppercase text-center shadow-2xl ${
+              notification.isError ? "bg-[#B91C1C] text-[#FFFFFF]" : "bg-[#007A3D] text-[#FFFFFF]"
+            }`}
+          >
+            {notification.message}
+          </div>
+        )}
+
+        <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} flex flex-col items-center text-center space-y-5 shadow-2xl`}>
+          <BlackAmericanHeritageLogo className="w-16 h-11" roundClass="rounded-2xl" />
           <div>
             <h1 className="text-2xl font-black uppercase tracking-wider text-current">The Black Card</h1>
             <p className="text-xs text-[#A1A1AA] mt-0.5">Heritage & Lineage • Verification Gateway</p>
           </div>
 
-          {authStep === "input" ? (
+          {/* STEP 1: Phone / Email Input */}
+          {authStep === "input" && (
             <div className="w-full space-y-4">
               <div className="flex rounded-2xl bg-[#000000] p-1">
                 <button
                   type="button"
                   onClick={() => setAuthMode("phone")}
-                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl ${
+                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition-none ${
                     authMode === "phone" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
                   }`}
                 >
@@ -698,7 +845,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setAuthMode("email")}
-                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl ${
+                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition-none ${
                     authMode === "email" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
                   }`}
                 >
@@ -708,64 +855,143 @@ export default function App() {
 
               <input
                 type={authMode === "phone" ? "tel" : "email"}
-                placeholder={authMode === "phone" ? "Mobile (e.g. 555-019-2834)" : "Email address"}
+                placeholder={authMode === "phone" ? "Mobile (e.g. 555-019-2834)" : "Email (e.g. cousin@gmail.com)"}
                 value={authInput}
                 onChange={(e) => setAuthInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendVerificationCode()}
                 className={`w-full p-3.5 text-sm rounded-2xl focus:outline-none ${inputClass}`}
               />
 
               <button
                 type="button"
-                onClick={() => {
-                  if (!authInput.trim()) {
-                    triggerNotification("Please enter your contact information.", true);
-                    return;
-                  }
-                  setAuthStep("verify");
-                  triggerNotification("Code sent! (Demo OTP: 123456)");
-                }}
-                className="w-full py-3.5 bg-[#F59E0B] text-[#000000] font-black text-sm uppercase rounded-2xl"
+                onClick={handleSendVerificationCode}
+                className="w-full py-3.5 bg-[#F59E0B] text-[#000000] font-black text-sm uppercase rounded-2xl active:scale-[0.98] transition-transform"
               >
                 Send Verification Code
               </button>
+
+              <div className="pt-2 border-t border-[#18181B] space-y-1.5">
+                <p className="text-[10px] text-[#A1A1AA] uppercase tracking-wider">Demo / Testing Quick Access</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentUserId("user-jay-001");
+                    setSelectedProfileId("user-jay-001");
+                    setIsAuthenticated(true);
+                    triggerNotification("Logged in as Godfather Jay (Admin).");
+                  }}
+                  className="w-full py-2.5 bg-[#000000] text-[#F59E0B] text-xs font-bold rounded-2xl"
+                >
+                  Enter as Godfather Jay (Admin)
+                </button>
+              </div>
             </div>
-          ) : (
+          )}
+
+          {/* STEP 2: 6-Digit OTP Verification */}
+          {authStep === "verify" && (
             <div className="w-full space-y-4">
-              <p className="text-xs text-[#A1A1AA]">
-                Enter the 6-digit code sent to <span className="font-bold text-[#FFFFFF]">{authInput}</span>
-              </p>
+              {/* Visible Verification Code Banner */}
+              <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
+                <p className="text-[10px] uppercase font-black text-[#A1A1AA] tracking-wider">
+                  Verification Code
+                </p>
+                <p className="text-2xl font-mono font-black text-[#F59E0B] tracking-widest">
+                  {generatedCode}
+                </p>
+                <p className="text-[10px] text-[#A1A1AA]">
+                  Sent to <span className="text-[#FFFFFF] font-bold">{authInput}</span>
+                </p>
+              </div>
+
               <input
                 type="text"
                 maxLength={6}
-                placeholder="123456"
+                placeholder="Enter 6-digit code"
                 value={authOtp}
                 onChange={(e) => setAuthOtp(e.target.value)}
-                className={`w-full p-3.5 text-center text-lg tracking-widest font-mono rounded-2xl focus:outline-none ${inputClass}`}
+                onKeyDown={(e) => e.key === "Enter" && handleVerifyCode()}
+                className={`w-full p-3.5 text-center text-xl tracking-widest font-mono font-bold rounded-2xl focus:outline-none ${inputClass}`}
               />
 
               <button
                 type="button"
-                onClick={() => {
-                  if (authOtp.trim().length < 4) {
-                    triggerNotification("Enter a valid verification code.", true);
-                    return;
-                  }
-                  setIsAuthenticated(true);
-                  triggerNotification("Identity verified. Welcome to The Black Card.");
-                }}
-                className="w-full py-3.5 bg-[#007A3D] text-[#FFFFFF] font-black text-sm uppercase rounded-2xl"
+                onClick={handleVerifyCode}
+                className="w-full py-3.5 bg-[#007A3D] text-[#FFFFFF] font-black text-sm uppercase rounded-2xl active:scale-[0.98] transition-transform"
               >
                 Verify & Enter
               </button>
 
-              <button
-                type="button"
-                onClick={() => setAuthStep("input")}
-                className="text-xs text-[#A1A1AA] hover:text-[#FFFFFF]"
-              >
-                Change Contact Method
-              </button>
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button
+                  type="button"
+                  disabled={cooldown > 0}
+                  onClick={handleSendVerificationCode}
+                  className={`font-bold ${cooldown > 0 ? "text-[#A1A1AA] cursor-not-allowed" : "text-[#F59E0B] hover:underline"}`}
+                >
+                  {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthStep("input")}
+                  className="text-[#A1A1AA] hover:text-[#FFFFFF]"
+                >
+                  Change Contact
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* STEP 3: First-time Member Registration */}
+          {authStep === "onboard" && (
+            <form onSubmit={handleCompleteOnboarding} className="w-full space-y-3.5 text-left">
+              <div className="text-center pb-1">
+                <h2 className="text-sm font-black uppercase text-[#F59E0B]">Claim Your Black Card</h2>
+                <p className="text-[11px] text-[#A1A1AA]">Set up your name and lineage bio</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-[#A1A1AA] block mb-1">
+                  Your Name / Handle
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Cousin Malik, Nia..."
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className={`w-full p-3 text-xs rounded-2xl focus:outline-none ${inputClass}`}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-[#A1A1AA] block mb-1">
+                  Lineage Bio / Motto
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Tell the cousins where you're from..."
+                  value={newBio}
+                  onChange={(e) => setNewBio(e.target.value)}
+                  className={`w-full p-3 text-xs rounded-2xl focus:outline-none resize-none ${inputClass}`}
+                />
+              </div>
+
+              <div className="p-3 bg-[#000000] rounded-2xl text-[11px] text-[#A1A1AA] space-y-1">
+                <div className="flex justify-between items-center text-current font-bold">
+                  <span>Starting Standing:</span>
+                  <span className="text-[#007A3D]">Kin Folk (25 SP)</span>
+                </div>
+                <p className="text-[10px]">Your official Passcard QR and Lineage ID will be minted instantly.</p>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#007A3D] text-[#FFFFFF] font-black text-xs uppercase tracking-wider rounded-2xl active:scale-[0.98] transition-transform"
+              >
+                Mint Passcard & Enter
+              </button>
+            </form>
           )}
         </div>
       </div>
@@ -784,6 +1010,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Header Bar */}
       <header className={`sticky top-0 z-40 px-4 py-3 ${theme === "dark" ? "bg-[#000000]" : "bg-[#FFFFFF]"}`}>
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div
@@ -801,7 +1028,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <div className="px-2.5 py-1 rounded-xl bg-[#18181B] text-[#F59E0B] text-[11px] font-black uppercase tracking-wider">
+            <div className="px-2.5 py-1 rounded-2xl bg-[#18181B] text-[#F59E0B] text-[11px] font-black uppercase tracking-wider">
               {myProfile.earnedSP} SP to give
             </div>
 
@@ -809,7 +1036,7 @@ export default function App() {
               type="button"
               onClick={() => handleGenerateShare("The Black Card Network")}
               title="Share Network Pass"
-              className="p-2 rounded-xl bg-[#18181B] text-[#FFFFFF] hover:text-[#F59E0B]"
+              className="p-2 rounded-2xl bg-[#18181B] text-[#FFFFFF] hover:text-[#F59E0B]"
             >
               <ShareIcon className="w-4 h-4" />
             </button>
@@ -817,12 +1044,13 @@ export default function App() {
             <button
               type="button"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-xl bg-[#18181B] text-[#F59E0B] text-xs font-black"
+              className="p-2 rounded-2xl bg-[#18181B] text-[#F59E0B] text-xs font-black"
               title="Toggle Theme"
             >
               {theme === "dark" ? "☀" : "☾"}
             </button>
 
+            {/* Logout to Gateway */}
             <button
               type="button"
               onClick={() => {
@@ -832,8 +1060,8 @@ export default function App() {
                 setAuthOtp("");
                 triggerNotification("Signed out of passcard session.");
               }}
-              className="p-2 rounded-xl bg-[#18181B] text-[#B91C1C] text-xs font-black"
-              title="Sign Out"
+              className="p-2 rounded-2xl bg-[#18181B] text-[#B91C1C] text-xs font-black"
+              title="Sign Out to Login Gateway"
             >
               ✕
             </button>
@@ -841,11 +1069,12 @@ export default function App() {
         </div>
       </header>
 
-      {}
+      {/* Main Views Container */}
       <main className="max-w-md mx-auto px-4 pt-2 space-y-4">
+        {/* ======================= TAB: PASSCARD ======================= */}
         {currentTab === "home" && (
           <div className="space-y-4">
-            <div className={`p-4 rounded-3xl ${cardClass} space-y-4`}>
+            <div className={`p-4 rounded-3xl ${cardClass} space-y-4 shadow-xl`}>
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black tracking-widest uppercase text-[#F59E0B]">
                   Official Lineage Passcard
@@ -871,12 +1100,13 @@ export default function App() {
                 </span>
               </div>
 
+              {/* Profile Row */}
               <div className="flex items-center space-x-3.5">
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-lg font-black text-[#FFFFFF] flex-shrink-0 cursor-pointer"
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-lg font-black text-[#FFFFFF] flex-shrink-0 cursor-pointer shadow-md"
                   style={{ backgroundColor: targetProfile.avatarBg || PALETTE.gold }}
                   onClick={() => isMyProfile && avatarInputRef.current && avatarInputRef.current.click()}
-                  title={isMyProfile ? "Change Avatar" : targetProfile.username}
+                  title={isMyProfile ? "Change Avatar Photo" : targetProfile.username}
                 >
                   {targetProfile.avatarText || targetProfile.username.substring(0, 2).toUpperCase()}
                 </div>
@@ -916,6 +1146,7 @@ export default function App() {
                 </button>
               </div>
 
+              {/* SP Counters */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="p-3 rounded-2xl bg-[#000000] flex flex-col justify-center">
                   <span className="text-[10px] font-black uppercase text-[#A1A1AA]">Total SP Received</span>
@@ -927,6 +1158,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Status and Bio */}
               <div className="space-y-2 pt-1 text-xs">
                 <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
                   <span className="text-[10px] font-black uppercase text-[#F59E0B]">Current Status</span>
@@ -938,12 +1170,13 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Passcard Actions */}
               <div className="flex flex-col space-y-2 pt-2">
                 {!isMyProfile && (
                   <button
                     type="button"
                     onClick={() => handleGiveSP(targetProfile)}
-                    className="w-full py-3.5 bg-[#007A3D] text-[#FFFFFF] font-black text-xs uppercase tracking-wider rounded-2xl"
+                    className="w-full py-3.5 bg-[#007A3D] text-[#FFFFFF] font-black text-xs uppercase tracking-wider rounded-2xl active:scale-[0.98] transition-transform"
                   >
                     Vouch & Give SP ({myTier.name === "God Mother / God Father" ? "+10 SP" : "+1 SP"})
                   </button>
@@ -981,9 +1214,9 @@ export default function App() {
               </div>
             </div>
 
-            {}
+            {/* Admin Sandbox Tools (Visible to Admins) */}
             {isCurrentUserAdmin && (
-              <div className={`p-4 rounded-3xl ${cardClass} space-y-3`}>
+              <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#B91C1C]"></span>
@@ -1104,13 +1337,13 @@ export default function App() {
           </div>
         )}
 
-        {}
+        {/* ======================= TAB: COMMUNITY WALL ======================= */}
         {currentTab === "feed" && (
           <div className="space-y-4">
-            <div className={`p-4 rounded-3xl ${cardClass} space-y-3 relative`}>
+            <div className={`p-4 rounded-3xl ${cardClass} space-y-3 relative shadow-xl`}>
               <div className="flex items-center space-x-2">
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-[#FFFFFF]"
+                  className="w-8 h-8 rounded-2xl flex items-center justify-center text-xs font-black text-[#FFFFFF]"
                   style={{ backgroundColor: myProfile.avatarBg || PALETTE.gold }}
                 >
                   {myProfile.avatarText}
@@ -1141,7 +1374,7 @@ export default function App() {
               <form onSubmit={handlePublishWallPost} className="space-y-2.5">
                 <textarea
                   rows={3}
-                  placeholder="Drop a note to the cousins... Type @ to mention someone directly."
+                  placeholder="Drop a note to the family... Type @ to mention a cousin directly."
                   value={wallText}
                   onChange={handleWallTextChange}
                   className={`w-full p-3 rounded-2xl text-xs focus:outline-none resize-none ${inputClass}`}
@@ -1191,7 +1424,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => wallPhotoInputRef.current && wallPhotoInputRef.current.click()}
-                      className="p-2 rounded-xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
+                      className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
                       title="Attach Photo"
                     >
                       <PhotoIcon className="w-4 h-4" />
@@ -1212,7 +1445,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => wallVideoInputRef.current && wallVideoInputRef.current.click()}
-                      className="p-2 rounded-xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
+                      className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
                       title="Attach Video"
                     >
                       <VideoIcon className="w-4 h-4" />
@@ -1233,7 +1466,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={handleStartAudioRecord}
-                        className="p-2 rounded-xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
+                        className="p-2 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B]"
                         title="Record Voice Note"
                       >
                         <MicIcon className="w-4 h-4" />
@@ -1242,7 +1475,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={handleStopAudioRecord}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#B91C1C] text-[#FFFFFF] text-xs font-bold animate-pulse"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-2xl bg-[#B91C1C] text-[#FFFFFF] text-xs font-bold animate-pulse"
                       >
                         <span className="w-2 h-2 rounded-full bg-[#FFFFFF]"></span>
                         <span>Stop ({recordingSeconds}s)</span>
@@ -1252,7 +1485,7 @@ export default function App() {
 
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-[#007A3D] text-[#FFFFFF] font-black text-xs uppercase tracking-wider rounded-2xl"
+                    className="px-5 py-2.5 bg-[#007A3D] text-[#FFFFFF] font-black text-xs uppercase tracking-wider rounded-2xl active:scale-[0.98] transition-transform"
                   >
                     Post to Wall
                   </button>
@@ -1262,7 +1495,7 @@ export default function App() {
 
             <div className="space-y-3">
               {feedLogs.map((item) => (
-                <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2`}>
+                <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2 shadow-lg`}>
                   {item.type === "vouch" && (
                     <div className="flex items-center space-x-2 text-xs">
                       <span className="p-1.5 rounded-xl bg-[#007A3D] text-[#FFFFFF] font-black text-[10px]">+SP</span>
@@ -1354,10 +1587,10 @@ export default function App() {
           </div>
         )}
 
-        {}
+        {/* ======================= TAB: COMMUNITY DIRECTORY ======================= */}
         {currentTab === "friends" && (
           <div className="space-y-3">
-            <div className={`p-4 rounded-3xl ${cardClass} space-y-3`}>
+            <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
               <h2 className="text-sm font-black uppercase tracking-wider text-[#F59E0B]">Community Directory</h2>
               <input
                 type="text"
@@ -1378,7 +1611,7 @@ export default function App() {
                       setSelectedProfileId(p.userId);
                       setCurrentTab("home");
                     }}
-                    className={`p-3.5 rounded-3xl ${cardClass} flex items-center justify-between cursor-pointer`}
+                    className={`p-3.5 rounded-3xl ${cardClass} flex items-center justify-between cursor-pointer shadow-md`}
                   >
                     <div className="flex items-center space-x-3">
                       <div
@@ -1411,10 +1644,10 @@ export default function App() {
           </div>
         )}
 
-        {}
+        {/* ======================= TAB: PENALTY BOX ======================= */}
         {currentTab === "banned" && (
           <div className="space-y-3">
-            <div className={`p-4 rounded-3xl ${cardClass} space-y-3`}>
+            <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-black uppercase tracking-wider text-[#B91C1C]">Hall of Accountability</h2>
                 <span className="text-[10px] text-[#A1A1AA]">{filteredBanned.length} Members</span>
@@ -1462,7 +1695,7 @@ export default function App() {
                       setSelectedProfileId(p.userId);
                       setCurrentTab("home");
                     }}
-                    className={`p-3.5 rounded-3xl ${cardClass} flex items-center justify-between cursor-pointer`}
+                    className={`p-3.5 rounded-3xl ${cardClass} flex items-center justify-between cursor-pointer shadow-md`}
                   >
                     <div className="flex items-center space-x-3">
                       <div
@@ -1496,17 +1729,17 @@ export default function App() {
         )}
       </main>
 
-      {}
+      {/* ======================= MODALS ======================= */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
-          <div className={`w-full max-w-xs p-6 rounded-3xl ${cardClass} text-center space-y-4`}>
+          <div className={`w-full max-w-xs p-6 rounded-3xl ${cardClass} text-center space-y-4 shadow-2xl`}>
             <BlackAmericanHeritageLogo className="w-12 h-8 mx-auto" roundClass="rounded-lg" />
             <div>
               <h3 className="text-sm font-black uppercase text-current">{targetProfile.username}</h3>
               <p className="text-[10px] text-[#F59E0B] font-bold">{targetTier.name}</p>
             </div>
 
-            <div className="p-4 bg-[#FFFFFF] rounded-2xl mx-auto w-48 h-48 flex items-center justify-center">
+            <div className="p-4 bg-[#FFFFFF] rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-inner">
               <QrIcon className="w-40 h-40 text-[#000000]" />
             </div>
 
@@ -1515,7 +1748,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowQrModal(false)}
-              className="w-full py-3 bg-[#000000] text-[#FFFFFF] font-black text-xs uppercase rounded-2xl"
+              className="w-full py-3 bg-[#000000] text-[#FFFFFF] font-black text-xs uppercase rounded-2xl active:scale-[0.98] transition-transform"
             >
               Close Passcard
             </button>
@@ -1525,7 +1758,7 @@ export default function App() {
 
       {showSanctionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
-          <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} space-y-4`}>
+          <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} space-y-4 shadow-2xl`}>
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase text-[#B91C1C]">
                 Propose {showSanctionModal.action === "revoke" ? "Revocation" : "30-Day Suspension"}
@@ -1558,7 +1791,7 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  className={`flex-1 py-3 text-xs font-black uppercase rounded-2xl ${
+                  className={`flex-1 py-3 text-xs font-black uppercase rounded-2xl active:scale-[0.98] transition-transform ${
                     showSanctionModal.action === "revoke" ? "bg-[#B91C1C] text-[#FFFFFF]" : "bg-[#F59E0B] text-[#000000]"
                   }`}
                 >
@@ -1574,7 +1807,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-[#000000] bg-opacity-95">
           <div className="w-full max-w-sm space-y-4 text-center">
             <h3 className="text-sm font-black uppercase text-[#F59E0B]">Passcard Scanner Viewfinder</h3>
-            <div className="relative w-full aspect-square bg-[#18181B] rounded-3xl overflow-hidden flex items-center justify-center">
+            <div className="relative w-full aspect-square bg-[#18181B] rounded-3xl overflow-hidden flex items-center justify-center shadow-2xl">
               <video ref={scannerVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
               <div className="absolute inset-8 rounded-2xl pointer-events-none flex items-center justify-center">
                 <span className="text-[10px] font-black uppercase text-[#F59E0B] bg-[#000000] px-2 py-1 rounded">
@@ -1594,7 +1827,7 @@ export default function App() {
                       stopAdminCameraScanner();
                       triggerNotification(`Loaded passcard for ${p.username}.`);
                     }}
-                    className="px-2.5 py-1 bg-[#18181B] text-[#FFFFFF] text-[10px] font-bold rounded-xl"
+                    className="px-2.5 py-1 bg-[#18181B] text-[#FFFFFF] text-[10px] font-bold rounded-2xl"
                   >
                     {p.username}
                   </button>
@@ -1613,6 +1846,7 @@ export default function App() {
         </div>
       )}
 
+      {/* ======================= BOTTOM APP NAVIGATION ======================= */}
       <nav
         className={`fixed bottom-0 inset-x-0 z-40 max-w-md mx-auto px-6 py-2.5 flex items-center justify-between rounded-t-3xl shadow-2xl ${
           theme === "dark" ? "bg-[#000000]" : "bg-[#FFFFFF]"
