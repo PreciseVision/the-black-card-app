@@ -11,6 +11,7 @@ const TIER_THRESHOLDS = {
 
 const REQUIRED_SP_FOR_CARD = TIER_THRESHOLDS.KIN;
 const SP_FOR_REVOKED_RECOVERY = 100;
+const POLL_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
 // Solid Pan-African & Heritage Palette
 const PALETTE = {
@@ -19,23 +20,25 @@ const PALETTE = {
   darkCard: "#18181B",
   green: "#007A3D",
   gold: "#F59E0B",
+  goldDark: "#D97706",
   white: "#FFFFFF",
   lightBg: "#F4F4F5",
-  lightCard: "#E4E4E7",
+  lightCard: "#FFFFFF",
+  lightCardAlt: "#E4E4E7",
   grayText: "#A1A1AA",
+  darkGrayText: "#52525B",
 };
 
 // Storage Keys for persistent sessions
 const STORAGE_KEYS = {
-  PROFILES: "tbc_profiles_v1",
-  CURRENT_USER_ID: "tbc_active_uid_v1",
-  FEED_LOGS: "tbc_feed_logs_v1",
-  SHARE_LOGS: "tbc_share_logs_v1",
+  PROFILES: "tbc_profiles_v2",
+  CURRENT_USER_ID: "tbc_active_uid_v2",
+  FEED_LOGS: "tbc_feed_logs_v2",
+  SHARE_LOGS: "tbc_share_logs_v2",
+  POLLS: "tbc_polls_v2",
 };
 
-// Lightweight scannable 21x21 QR Code Generator (Zero external dependencies)
 function generateQRCodeMatrix(text) {
-  // 21x21 grid initialization
   const size = 21;
   const matrix = Array.from({ length: size }, () => Array(size).fill(false));
   const reserved = Array.from({ length: size }, () => Array(size).fill(false));
@@ -49,7 +52,6 @@ function generateQRCodeMatrix(text) {
         reserved[startY + y][startX + x] = true;
       }
     }
-    // Separators
     for (let y = -1; y <= 7; y++) {
       for (let x = -1; x <= 7; x++) {
         const px = startX + x;
@@ -61,12 +63,10 @@ function generateQRCodeMatrix(text) {
     }
   };
 
-  // 3 Finder patterns
   setFinder(0, 0);
   setFinder(size - 7, 0);
   setFinder(0, size - 7);
 
-  // Timing patterns
   for (let i = 8; i < size - 8; i++) {
     matrix[6][i] = i % 2 === 0;
     matrix[i][6] = i % 2 === 0;
@@ -74,11 +74,9 @@ function generateQRCodeMatrix(text) {
     reserved[i][6] = true;
   }
 
-  // Dark module
   matrix[size - 8][8] = true;
   reserved[size - 8][8] = true;
 
-  // Simple deterministic data bitstream from input string
   let hash = 0;
   for (let i = 0; i < text.length; i++) {
     hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
@@ -86,7 +84,7 @@ function generateQRCodeMatrix(text) {
 
   let bitIdx = 0;
   for (let c = size - 1; c > 0; c -= 2) {
-    if (c === 6) c--; // Skip vertical timing column
+    if (c === 6) c--;
     for (let r = 0; r < size; r++) {
       const y = (c & 2) === 0 ? size - 1 - r : r;
       for (let col = 0; col < 2; col++) {
@@ -94,7 +92,7 @@ function generateQRCodeMatrix(text) {
         if (!reserved[y][x]) {
           const charCode = text.charCodeAt(bitIdx % text.length) || 42;
           const bitVal = ((charCode >> (bitIdx % 8)) ^ (hash >> ((x + y) % 16))) & 1;
-          const mask = (x + y) % 2 === 0; // Standard QR Mask 0
+          const mask = (x + y) % 2 === 0;
           matrix[y][x] = (bitVal ^ (mask ? 1 : 0)) === 1;
           bitIdx++;
         }
@@ -131,7 +129,6 @@ const RealQRCodeSVG = ({ value, size = 180, bgColor = "#FFFFFF", fgColor = "#000
   );
 };
 
-// Tier Evaluation Helper
 const getTierInfo = (sp, blackCardStatus) => {
   if (blackCardStatus === "revoked") {
     return { name: "Revoked", color: PALETTE.red };
@@ -157,13 +154,8 @@ const getTierInfo = (sp, blackCardStatus) => {
   return { name: "Unvouched", color: PALETTE.grayText };
 };
 
-// 1967 Black American Heritage Flag
 const BlackAmericanHeritageLogo = ({ className = "w-9 h-6", roundClass = "rounded-lg" }) => (
-  <svg
-    viewBox="0 0 120 80"
-    className={`${className} ${roundClass} flex-shrink-0`}
-    xmlns="http://www.w3.org/2000/svg"
-  >
+  <svg viewBox="0 0 120 80" className={`${className} ${roundClass} flex-shrink-0`} xmlns="http://www.w3.org/2000/svg">
     <rect width="120" height="80" fill="#B91C1C" />
     <polygon points="36,0 120,0 84,80 0,80" fill="#000000" />
     <g transform="translate(60, 40) scale(0.68)">
@@ -213,10 +205,9 @@ const QrIcon = ({ className = "w-6 h-6" }) => (
   </svg>
 );
 
-const CameraIcon = ({ className = "w-5 h-5" }) => (
+const PollIcon = ({ className = "w-5 h-5" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
   </svg>
 );
 
@@ -253,6 +244,19 @@ const CloseIcon = ({ className = "w-5 h-5" }) => (
 const PencilIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+
+const LockClosedIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+);
+
+const CameraIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
 
@@ -343,7 +347,69 @@ const SEED_PROFILES = {
   },
 };
 
+const SEED_POLLS = {
+  "poll-1": {
+    id: "poll-1",
+    creatorId: "user-jay-001",
+    creatorName: "Godfather Jay",
+    type: "ab", // 'ab' | 'multiple' | 'fill'
+    question: "Cookout Debate: Baked Macaroni & Cheese or Stovetop?",
+    options: ["Baked Mac (Crust on top)", "Stovetop (Creamy)"],
+    votes: {
+      "user-deb-002": 0,
+      "user-mike-003": 0,
+      "user-coolio-004": 0,
+    },
+    fillResponses: [],
+    createdAt: Date.now() - 25 * 60 * 60 * 1000, // Expired sample to demonstrate highlighting
+    expiresAt: Date.now() - 1 * 60 * 60 * 1000,
+  },
+  "poll-2": {
+    id: "poll-2",
+    creatorId: "user-deb-002",
+    creatorName: "Aunty Deb",
+    type: "fill",
+    question: "Complete the saying: If you don't know who cooked the potato salad, you don't _____.",
+    options: [],
+    votes: {},
+    fillResponses: [
+      {
+        id: "resp-1",
+        userId: "user-mike-003",
+        username: "MikeFresh",
+        text: "Touch a single spoonful. Keep walking!",
+        timestamp: Date.now() - 3600000,
+      },
+      {
+        id: "resp-2",
+        userId: "user-coolio-004",
+        username: "Coolio",
+        text: "Put it on your paper plate!",
+        timestamp: Date.now() - 1800000,
+      },
+    ],
+    createdAt: Date.now() - 4 * 60 * 60 * 1000,
+    expiresAt: Date.now() + 20 * 60 * 60 * 1000,
+  },
+};
+
 const SEED_FEED_LOGS = [
+  {
+    id: "log-poll-2",
+    type: "poll",
+    pollId: "poll-2",
+    authorId: "user-deb-002",
+    authorName: "Aunty Deb",
+    timestamp: Date.now() - 4 * 60 * 60 * 1000,
+  },
+  {
+    id: "log-poll-1",
+    type: "poll",
+    pollId: "poll-1",
+    authorId: "user-jay-001",
+    authorName: "Godfather Jay",
+    timestamp: Date.now() - 25 * 60 * 60 * 1000,
+  },
   {
     id: "log-1",
     type: "vouch",
@@ -352,21 +418,9 @@ const SEED_FEED_LOGS = [
     amount: 10,
     timestamp: Date.now() - 3600000,
   },
-  {
-    id: "log-2",
-    type: "wall_post",
-    authorId: "user-deb-002",
-    authorName: "Aunty Deb",
-    text: "Make sure everybody checks on @MikeFresh before the cookout tomorrow. Bring containers!",
-    image: null,
-    video: null,
-    audio: null,
-    timestamp: Date.now() - 7200000,
-  },
 ];
 
 export default function App() {
-  // Read persisted profiles from localStorage if available
   const [profiles, setProfiles] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.PROFILES);
@@ -376,7 +430,6 @@ export default function App() {
     }
   });
 
-  // Authentication & session management
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(() => {
     try {
@@ -388,15 +441,15 @@ export default function App() {
   });
   const [selectedProfileId, setSelectedProfileId] = useState("user-jay-001");
 
-  // Gateway Authentication state
-  const [authMode, setAuthMode] = useState("phone"); // 'phone' | 'email'
+  // Gateway Auth state
+  const [authMode, setAuthMode] = useState("phone");
   const [authInput, setAuthInput] = useState("");
   const [authOtp, setAuthOtp] = useState("");
-  const [authStep, setAuthStep] = useState("input"); // 'input' | 'verify' | 'onboard'
+  const [authStep, setAuthStep] = useState("input");
   const [generatedCode, setGeneratedCode] = useState("");
   const [cooldown, setCooldown] = useState(0);
 
-  // New User Onboarding state
+  // New Member Onboarding state
   const [newUsername, setNewUsername] = useState("");
   const [newBio, setNewBio] = useState("");
 
@@ -407,11 +460,11 @@ export default function App() {
   const [directoryFilter, setDirectoryFilter] = useState("");
   const [bannedFilter, setBannedFilter] = useState("all");
 
-  // Status editing modal / prompt state
+  // Status editing state
   const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [statusDraft, setStatusDraft] = useState("");
 
-  // Community Wall & Feed state (persisted)
+  // Feed logs
   const [feedLogs, setFeedLogs] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.FEED_LOGS);
@@ -421,7 +474,31 @@ export default function App() {
     }
   });
 
-  // Multimedia Post Composer state
+  // Polls engine state
+  const [polls, setPolls] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.POLLS);
+      return stored ? JSON.parse(stored) : SEED_POLLS;
+    } catch {
+      return SEED_POLLS;
+    }
+  });
+
+  // Poll creation modal & form
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollType, setPollType] = useState("ab"); // 'ab' | 'multiple' | 'fill'
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptionA, setPollOptionA] = useState("");
+  const [pollOptionB, setPollOptionB] = useState("");
+  const [pollMultipleOptions, setPollMultipleOptions] = useState(["", "", ""]);
+
+  // Fill in the blank answering state
+  const [fillAnswerInputs, setFillAnswerInputs] = useState({});
+  const [activePollAnswersView, setActivePollAnswersView] = useState(null); // pollId
+  const [replyModalData, setReplyModalData] = useState(null); // { poll, response }
+  const [replyCommentText, setReplyCommentText] = useState("");
+
+  // Multimedia post composer state
   const [wallText, setWallText] = useState("");
   const [attachedImage, setAttachedImage] = useState(null);
   const [attachedVideo, setAttachedVideo] = useState(null);
@@ -430,26 +507,14 @@ export default function App() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [mentionQuery, setMentionQuery] = useState(null);
 
-  // Admin Sandbox & Audit Logs
+  // Admin sandbox
   const [adminTargetSpInput, setAdminTargetSpInput] = useState("");
   const [adminMemberSearchTerm, setAdminMemberSearchTerm] = useState("");
   const [showAdminScanner, setShowAdminScanner] = useState(false);
   const [shareAuditLogs, setShareAuditLogs] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SHARE_LOGS);
-      return stored
-        ? JSON.parse(stored)
-        : [
-            {
-              id: "trk-seed-1",
-              trackingId: "TRK-BCH891",
-              senderName: "Godfather Jay",
-              targetName: "Community Passcard",
-              channel: "Direct Copy",
-              clicks: 14,
-              timestamp: Date.now() - 86400000,
-            },
-          ];
+      return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
@@ -469,8 +534,8 @@ export default function App() {
   const recordingTimerRef = useRef(null);
   const scannerVideoRef = useRef(null);
   const scannerStreamRef = useRef(null);
+  const hiddenCanvasRef = useRef(null);
 
-  // Sync profiles to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(profiles));
@@ -479,7 +544,14 @@ export default function App() {
     }
   }, [profiles]);
 
-  // Sync feed to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.POLLS, JSON.stringify(polls));
+    } catch (e) {
+      console.warn("Poll storage sync failed", e);
+    }
+  }, [polls]);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.FEED_LOGS, JSON.stringify(feedLogs));
@@ -488,7 +560,6 @@ export default function App() {
     }
   }, [feedLogs]);
 
-  // Sync share audit logs to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.SHARE_LOGS, JSON.stringify(shareAuditLogs));
@@ -497,7 +568,6 @@ export default function App() {
     }
   }, [shareAuditLogs]);
 
-  // Sync active user ID
   useEffect(() => {
     try {
       if (currentUserId) {
@@ -508,7 +578,6 @@ export default function App() {
     }
   }, [currentUserId]);
 
-  // Resend code cooldown countdown
   useEffect(() => {
     if (cooldown > 0) {
       const timer = setTimeout(() => setCooldown((prev) => prev - 1), 1000);
@@ -520,7 +589,7 @@ export default function App() {
     setNotification({ message, isError });
     setTimeout(() => {
       setNotification(null);
-    }, 3200);
+    }, 3400);
   };
 
   const normalizeContact = (str = "") => str.trim().toLowerCase().replace(/[^a-z0-9@.]/g, "");
@@ -578,7 +647,7 @@ export default function App() {
       triggerNotification(`Welcome back, ${existingProfile.username}! Session resumed.`);
     } else {
       setAuthStep("onboard");
-      triggerNotification("Verification confirmed! Set up your Black Card profile.");
+      triggerNotification("Verification confirmed! Claim your Black Card passcard.");
     }
   };
 
@@ -639,6 +708,240 @@ export default function App() {
     ]);
 
     triggerNotification(`Welcome to The Black Card, ${usernameClean}!`);
+  };
+
+  const handleCreatePoll = (e) => {
+    e.preventDefault();
+    if (!pollQuestion.trim()) {
+      triggerNotification("Please enter a poll question.", true);
+      return;
+    }
+
+    let finalOptions = [];
+    if (pollType === "ab") {
+      if (!pollOptionA.trim() || !pollOptionB.trim()) {
+        triggerNotification("Please provide both option A and option B.", true);
+        return;
+      }
+      finalOptions = [pollOptionA.trim(), pollOptionB.trim()];
+    } else if (pollType === "multiple") {
+      finalOptions = pollMultipleOptions.map((o) => o.trim()).filter(Boolean);
+      if (finalOptions.length < 2) {
+        triggerNotification("Please provide at least 2 options for multiple choice.", true);
+        return;
+      }
+    }
+
+    const pollId = `poll-${Date.now()}`;
+    const newPoll = {
+      id: pollId,
+      creatorId: currentUserId,
+      creatorName: myProfile.username,
+      type: pollType,
+      question: pollQuestion.trim(),
+      options: finalOptions,
+      votes: {},
+      fillResponses: [],
+      createdAt: Date.now(),
+      expiresAt: Date.now() + POLL_EXPIRATION_MS, // 24-hour expiration
+    };
+
+    setPolls((prev) => ({
+      ...prev,
+      [pollId]: newPoll,
+    }));
+
+    setFeedLogs((prev) => [
+      {
+        id: `feed-poll-${Date.now()}`,
+        type: "poll",
+        pollId: pollId,
+        authorId: currentUserId,
+        authorName: myProfile.username,
+        timestamp: Date.now(),
+      },
+      ...prev,
+    ]);
+
+    setShowPollCreator(false);
+    setPollQuestion("");
+    setPollOptionA("");
+    setPollOptionB("");
+    setPollMultipleOptions(["", "", ""]);
+    triggerNotification("24-Hour Community Poll published!");
+  };
+
+  const handleVotePoll = (pollId, optionIndex) => {
+    const poll = polls[pollId];
+    if (!poll) return;
+    if (Date.now() > poll.expiresAt) {
+      triggerNotification("This poll has ended (24-hour window closed).", true);
+      return;
+    }
+
+    setPolls((prev) => {
+      const p = prev[pollId];
+      return {
+        ...prev,
+        [pollId]: {
+          ...p,
+          votes: {
+            ...p.votes,
+            [currentUserId]: optionIndex,
+          },
+        },
+      };
+    });
+
+    triggerNotification("Vote counted!");
+  };
+
+  const handleSubmitFillAnswer = (pollId) => {
+    const text = (fillAnswerInputs[pollId] || "").trim();
+    if (!text) {
+      triggerNotification("Please type an answer before submitting.", true);
+      return;
+    }
+
+    const poll = polls[pollId];
+    if (!poll) return;
+    if (Date.now() > poll.expiresAt) {
+      triggerNotification("This poll has ended (24-hour window closed).", true);
+      return;
+    }
+
+    const newResponse = {
+      id: `resp-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      userId: currentUserId,
+      username: myProfile.username,
+      text: text,
+      timestamp: Date.now(),
+    };
+
+    setPolls((prev) => {
+      const p = prev[pollId];
+      return {
+        ...prev,
+        [pollId]: {
+          ...p,
+          fillResponses: [newResponse, ...(p.fillResponses || [])],
+        },
+      };
+    });
+
+    setFillAnswerInputs((prev) => ({ ...prev, [pollId]: "" }));
+    triggerNotification("Your response was submitted privately to the poll creator!");
+  };
+
+  const generatePngFromAnswer = (pollQuestion, respondentName, respondentText, replyText) => {
+    return new Promise((resolve) => {
+      const canvas = hiddenCanvasRef.current || document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 540;
+      const ctx = canvas.getContext("2d");
+
+      // Solid Pan-African black card background
+      ctx.fillStyle = "#18181B";
+      ctx.fillRect(0, 0, 900, 540);
+
+      // Top Tri-Color Heritage Banner
+      ctx.fillStyle = "#B91C1C";
+      ctx.fillRect(0, 0, 300, 16);
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(300, 0, 300, 16);
+      ctx.fillStyle = "#007A3D";
+      ctx.fillRect(600, 0, 300, 16);
+
+      // Card Header
+      ctx.fillStyle = "#F59E0B";
+      ctx.font = "900 24px sans-serif";
+      ctx.fillText("THE BLACK CARD • FILL-IN POLL SUBMISSION", 48, 64);
+
+      // Question Title
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 28px sans-serif";
+      const words = (`"${pollQuestion}"`).split(" ");
+      let line = "";
+      let y = 114;
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + " ";
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > 800 && n > 0) {
+          ctx.fillText(line, 48, y);
+          line = words[n] + " ";
+          y += 36;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, 48, y);
+
+      // Respondent Bubble Background
+      y += 24;
+      ctx.fillStyle = "#000000";
+      ctx.beginPath();
+      ctx.roundRect(48, y, 804, 150, 20);
+      ctx.fill();
+
+      // Respondent Label
+      ctx.fillStyle = "#F59E0B";
+      ctx.font = "900 20px sans-serif";
+      ctx.fillText(`@${respondentName} answered:`, 72, y + 42);
+
+      // Respondent text
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "italic 24px sans-serif";
+      ctx.fillText(`"${respondentText}"`, 72, y + 90);
+
+      // Creator Reply Banner at Bottom
+      y += 180;
+      ctx.fillStyle = "#007A3D";
+      ctx.beginPath();
+      ctx.roundRect(48, y, 804, 96, 20);
+      ctx.fill();
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "900 18px sans-serif";
+      ctx.fillText(`CREATOR RESPONSE BY @${myProfile.username}:`, 72, y + 36);
+
+      ctx.font = "bold 22px sans-serif";
+      ctx.fillText(replyText ? `"${replyText}"` : "Official Council Spotlight", 72, y + 70);
+
+      const dataUrl = canvas.toDataURL("image/png");
+      resolve(dataUrl);
+    });
+  };
+
+  const handlePostReplyAsPng = async (e) => {
+    e.preventDefault();
+    if (!replyModalData) return;
+    const { poll, response } = replyModalData;
+
+    const pngUrl = await generatePngFromAnswer(
+      poll.question,
+      response.username,
+      response.text,
+      replyCommentText.trim()
+    );
+
+    const newWallPost = {
+      id: `wall-reply-${Date.now()}`,
+      type: "wall_post",
+      authorId: currentUserId,
+      authorName: myProfile.username,
+      text: replyCommentText.trim()
+        ? `Spotlighting @${response.username}'s poll answer: "${replyCommentText.trim()}"`
+        : `Spotlighting @${response.username}'s answer on the Community Wall!`,
+      image: pngUrl,
+      video: null,
+      audio: null,
+      timestamp: Date.now(),
+    };
+
+    setFeedLogs((prev) => [newWallPost, ...prev]);
+    setReplyModalData(null);
+    setReplyCommentText("");
+    triggerNotification("Answer converted to .PNG card and posted to your wall!");
   };
 
   const handleStartAudioRecord = async () => {
@@ -712,31 +1015,6 @@ export default function App() {
     const updated = `${prefix}@${username} `;
     setWallText(updated);
     setMentionQuery(null);
-  };
-
-  const startAdminCameraScanner = async () => {
-    setShowAdminScanner(true);
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
-        scannerStreamRef.current = stream;
-        if (scannerVideoRef.current) {
-          scannerVideoRef.current.srcObject = stream;
-        }
-      }
-    } catch (err) {
-      console.warn("Camera inaccessible; manual scan available.", err);
-    }
-  };
-
-  const stopAdminCameraScanner = () => {
-    if (scannerStreamRef.current) {
-      scannerStreamRef.current.getTracks().forEach((t) => t.stop());
-      scannerStreamRef.current = null;
-    }
-    setShowAdminScanner(false);
   };
 
   const handleGiveSP = (target) => {
@@ -917,66 +1195,6 @@ export default function App() {
     }
   };
 
-  const handleToggleAdminRole = (target) => {
-    if (!isCurrentUserAdmin) return;
-    if (target.userId === currentUserId && target.isAdmin) {
-      triggerNotification("You cannot demote yourself from Admin status.", true);
-      return;
-    }
-
-    const nextAdminState = !target.isAdmin;
-    setProfiles((prev) => ({
-      ...prev,
-      [target.userId]: {
-        ...prev[target.userId],
-        isAdmin: nextAdminState,
-      },
-    }));
-
-    triggerNotification(
-      `${nextAdminState ? "Promoted" : "Demoted"} ${target.username} ${nextAdminState ? "to Council Admin" : "to standard member"}.`
-    );
-  };
-
-  const handleAdminAdjustSp = (amount) => {
-    if (!isCurrentUserAdmin) return;
-    setProfiles((prev) => {
-      const target = prev[selectedProfileId];
-      const newSp = Math.max(0, target.socialProof + amount);
-      return {
-        ...prev,
-        [selectedProfileId]: {
-          ...target,
-          socialProof: newSp,
-          blackCardStatus: newSp >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== "revoked" ? "active" : target.blackCardStatus,
-        },
-      };
-    });
-    triggerNotification(`Adjusted SP by ${amount > 0 ? `+${amount}` : amount}.`);
-  };
-
-  const handleAdminSetSp = () => {
-    if (!isCurrentUserAdmin) return;
-    const num = parseInt(adminTargetSpInput, 10);
-    if (isNaN(num) || num < 0) {
-      triggerNotification("Enter a valid non-negative number.", true);
-      return;
-    }
-    setProfiles((prev) => {
-      const target = prev[selectedProfileId];
-      return {
-        ...prev,
-        [selectedProfileId]: {
-          ...target,
-          socialProof: num,
-          blackCardStatus: num >= REQUIRED_SP_FOR_CARD && target.blackCardStatus !== "revoked" ? "active" : target.blackCardStatus,
-        },
-      };
-    });
-    setAdminTargetSpInput("");
-    triggerNotification(`Set ${targetProfile.username}'s SP to ${num}.`);
-  };
-
   const handlePublishWallPost = (e) => {
     e.preventDefault();
     if (!wallText.trim() && !attachedImage && !attachedVideo && !attachedAudio) {
@@ -1027,9 +1245,12 @@ export default function App() {
   const targetTier = getTierInfo(targetProfile.socialProof, targetProfile.blackCardStatus);
   const myTier = getTierInfo(myProfile.socialProof, myProfile.blackCardStatus);
 
-  const bgClass = theme === "dark" ? "bg-[#000000] text-[#FFFFFF]" : "bg-[#FFFFFF] text-[#000000]";
-  const cardClass = theme === "dark" ? "bg-[#18181B] text-[#FFFFFF]" : "bg-[#F4F4F5] text-[#000000]";
-  const inputClass = theme === "dark" ? "bg-[#000000] text-[#FFFFFF]" : "bg-[#E4E4E7] text-[#000000]";
+  const bgClass = theme === "dark" ? "bg-[#000000] text-[#FFFFFF]" : "bg-[#F4F4F5] text-[#18181B]";
+  const cardClass = theme === "dark" ? "bg-[#18181B] text-[#FFFFFF]" : "bg-[#FFFFFF] text-[#18181B] shadow-sm";
+  const innerBoxClass = theme === "dark" ? "bg-[#000000] text-[#FFFFFF]" : "bg-[#F4F4F5] text-[#18181B]";
+  const inputClass = theme === "dark" ? "bg-[#000000] text-[#FFFFFF]" : "bg-[#F4F4F5] text-[#18181B]";
+  const goldLinkClass = theme === "dark" ? "text-[#F59E0B] hover:text-[#FFFFFF]" : "text-[#D97706] hover:text-[#B91C1C] font-black";
+  const subTextClass = theme === "dark" ? "text-[#A1A1AA]" : "text-[#52525B]";
 
   if (!isAuthenticated) {
     return (
@@ -1048,18 +1269,17 @@ export default function App() {
           <BlackAmericanHeritageLogo className="w-16 h-11" roundClass="rounded-2xl" />
           <div>
             <h1 className="text-2xl font-black uppercase tracking-wider text-current">The Black Card</h1>
-            <p className="text-xs text-[#A1A1AA] mt-0.5">Heritage & Lineage • Verification Gateway</p>
+            <p className={`text-xs ${subTextClass} mt-0.5`}>Heritage & Lineage • Verification Gateway</p>
           </div>
 
-          {/* STEP 1: Phone / Email Input */}
           {authStep === "input" && (
             <div className="w-full space-y-4">
-              <div className="flex rounded-2xl bg-[#000000] p-1">
+              <div className={`flex rounded-2xl ${innerBoxClass} p-1`}>
                 <button
                   type="button"
                   onClick={() => setAuthMode("phone")}
-                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition-none ${
-                    authMode === "phone" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
+                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl ${
+                    authMode === "phone" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
                   }`}
                 >
                   Phone SMS
@@ -1067,8 +1287,8 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setAuthMode("email")}
-                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition-none ${
-                    authMode === "email" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
+                  className={`flex-1 py-2 text-xs font-black uppercase rounded-xl ${
+                    authMode === "email" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
                   }`}
                 >
                   Email
@@ -1094,18 +1314,17 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 2: 6-Digit OTP Verification */}
           {authStep === "verify" && (
             <div className="w-full space-y-4">
-              <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
-                <p className="text-[10px] uppercase font-black text-[#A1A1AA] tracking-wider">
+              <div className={`p-3 ${innerBoxClass} rounded-2xl space-y-1`}>
+                <p className={`text-[10px] uppercase font-black ${subTextClass} tracking-wider`}>
                   Verification Code
                 </p>
                 <p className="text-2xl font-mono font-black text-[#F59E0B] tracking-widest">
                   {generatedCode}
                 </p>
-                <p className="text-[10px] text-[#A1A1AA]">
-                  Sent to <span className="text-[#FFFFFF] font-bold">{authInput}</span>
+                <p className={`text-[10px] ${subTextClass}`}>
+                  Sent to <span className="font-bold text-current">{authInput}</span>
                 </p>
               </div>
 
@@ -1132,14 +1351,14 @@ export default function App() {
                   type="button"
                   disabled={cooldown > 0}
                   onClick={handleSendVerificationCode}
-                  className={`font-bold ${cooldown > 0 ? "text-[#A1A1AA] cursor-not-allowed" : "text-[#F59E0B] hover:underline"}`}
+                  className={`font-bold ${cooldown > 0 ? "text-gray-400 cursor-not-allowed" : goldLinkClass}`}
                 >
                   {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setAuthStep("input")}
-                  className="text-[#A1A1AA] hover:text-[#FFFFFF]"
+                  className={`${subTextClass} hover:text-current`}
                 >
                   Change Contact
                 </button>
@@ -1147,16 +1366,15 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 3: First-time Member Registration */}
           {authStep === "onboard" && (
             <form onSubmit={handleCompleteOnboarding} className="w-full space-y-3.5 text-left">
               <div className="text-center pb-1">
                 <h2 className="text-sm font-black uppercase text-[#F59E0B]">Claim Your Black Card</h2>
-                <p className="text-[11px] text-[#A1A1AA]">Set up your name and lineage bio</p>
+                <p className={`text-[11px] ${subTextClass}`}>Set up your name and lineage bio</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#A1A1AA] block mb-1">
+                <label className={`text-[10px] font-black uppercase tracking-wider ${subTextClass} block mb-1`}>
                   Your Name / Handle
                 </label>
                 <input
@@ -1170,7 +1388,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-[#A1A1AA] block mb-1">
+                <label className={`text-[10px] font-black uppercase tracking-wider ${subTextClass} block mb-1`}>
                   Lineage Bio / Motto
                 </label>
                 <textarea
@@ -1182,7 +1400,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="p-3 bg-[#000000] rounded-2xl text-[11px] text-[#A1A1AA] space-y-1">
+              <div className={`p-3 ${innerBoxClass} rounded-2xl text-[11px] ${subTextClass} space-y-1`}>
                 <div className="flex justify-between items-center text-current font-bold">
                   <span>Starting Standing:</span>
                   <span className="text-[#007A3D]">Kin Folk (25 SP)</span>
@@ -1205,6 +1423,8 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${bgClass} pb-24 font-sans`}>
+      <canvas ref={hiddenCanvasRef} className="hidden" />
+
       {notification && (
         <div
           className={`fixed top-4 inset-x-4 max-w-md mx-auto z-50 p-3.5 rounded-2xl text-xs font-black uppercase text-center shadow-2xl ${
@@ -1216,7 +1436,7 @@ export default function App() {
       )}
 
       {/* Header Bar */}
-      <header className={`sticky top-0 z-40 px-4 py-3 ${theme === "dark" ? "bg-[#000000]" : "bg-[#FFFFFF]"}`}>
+      <header className={`sticky top-0 z-40 px-4 py-3 ${theme === "dark" ? "bg-[#000000]" : "bg-[#FFFFFF] shadow-sm"}`}>
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div
             className="flex items-center space-x-2.5 cursor-pointer"
@@ -1228,12 +1448,12 @@ export default function App() {
             <BlackAmericanHeritageLogo className="w-8 h-5.5" roundClass="rounded-md" />
             <div>
               <h1 className="text-sm font-black uppercase tracking-wider leading-none text-current">The Black Card</h1>
-              <p className="text-[10px] text-[#A1A1AA] leading-tight">Heritage & Lineage</p>
+              <p className={`text-[10px] ${goldLinkClass} leading-tight`}>Heritage & Lineage</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <div className="px-2.5 py-1 rounded-2xl bg-[#18181B] text-[#F59E0B] text-[11px] font-black uppercase tracking-wider">
+            <div className={`px-2.5 py-1 rounded-2xl ${innerBoxClass} ${goldLinkClass} text-[11px] font-black uppercase tracking-wider`}>
               {myProfile.earnedSP} SP to give
             </div>
 
@@ -1241,21 +1461,20 @@ export default function App() {
               type="button"
               onClick={() => handleGenerateShare("The Black Card Network")}
               title="Share Network Pass"
-              className="p-2 rounded-2xl bg-[#18181B] text-[#FFFFFF] hover:text-[#F59E0B]"
+              className={`p-2 rounded-2xl ${innerBoxClass} hover:text-[#F59E0B]`}
             >
-              <ShareIcon className="w-4 h-4" />
+              <ShareIcon className="w-4 h-4 text-current" />
             </button>
 
             <button
               type="button"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-2xl bg-[#18181B] text-[#F59E0B] text-xs font-black"
+              className={`p-2 rounded-2xl ${innerBoxClass} text-xs font-black text-[#F59E0B]`}
               title="Toggle Theme"
             >
               {theme === "dark" ? "☀" : "☾"}
             </button>
 
-            {/* Logout to Gateway */}
             <button
               type="button"
               onClick={() => {
@@ -1265,7 +1484,7 @@ export default function App() {
                 setAuthOtp("");
                 triggerNotification("Signed out. Re-enter your contact to resume session.");
               }}
-              className="p-2 rounded-2xl bg-[#18181B] text-[#B91C1C] text-xs font-black"
+              className={`p-2 rounded-2xl ${innerBoxClass} text-[#B91C1C] text-xs font-black`}
               title="Sign Out to Login Gateway"
             >
               ✕
@@ -1274,14 +1493,14 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Views Container */}
+      {/* Main Container */}
       <main className="max-w-md mx-auto px-4 pt-2 space-y-4">
         {/* ======================= TAB: PASSCARD ======================= */}
         {currentTab === "home" && (
           <div className="space-y-4">
             <div className={`p-4 rounded-3xl ${cardClass} space-y-4 shadow-xl`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black tracking-widest uppercase text-[#F59E0B]">
+                <span className={`text-[10px] font-black tracking-widest uppercase ${goldLinkClass}`}>
                   Official Lineage Passcard
                 </span>
                 <span
@@ -1337,14 +1556,14 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs font-bold text-[#F59E0B]">{targetTier.name}</p>
-                  <p className="text-[10px] text-[#A1A1AA] font-mono truncate">ID: {targetProfile.userId}</p>
+                  <p className={`text-xs font-bold ${goldLinkClass}`}>{targetTier.name}</p>
+                  <p className={`text-[10px] ${subTextClass} font-mono truncate`}>ID: {targetProfile.userId}</p>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setShowQrModal(true)}
-                  className="p-3 bg-[#000000] text-[#F59E0B] rounded-2xl flex-shrink-0"
+                  className={`p-3 ${innerBoxClass} text-[#F59E0B] rounded-2xl flex-shrink-0 shadow-sm`}
                   title="View Scannable Passcard QR Code"
                 >
                   <QrIcon className="w-5 h-5" />
@@ -1353,21 +1572,21 @@ export default function App() {
 
               {/* SP Counters */}
               <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="p-3 rounded-2xl bg-[#000000] flex flex-col justify-center">
-                  <span className="text-[10px] font-black uppercase text-[#A1A1AA]">Total SP Received</span>
-                  <span className="text-2xl font-black text-[#FFFFFF]">{targetProfile.socialProof}</span>
+                <div className={`p-3 rounded-2xl ${innerBoxClass} flex flex-col justify-center`}>
+                  <span className={`text-[10px] font-black uppercase ${subTextClass}`}>Total SP Received</span>
+                  <span className="text-2xl font-black text-current">{targetProfile.socialProof}</span>
                 </div>
-                <div className="p-3 rounded-2xl bg-[#000000] flex flex-col justify-center">
-                  <span className="text-[10px] font-black uppercase text-[#A1A1AA]">Council Standing</span>
+                <div className={`p-3 rounded-2xl ${innerBoxClass} flex flex-col justify-center`}>
+                  <span className={`text-[10px] font-black uppercase ${subTextClass}`}>Council Standing</span>
                   <span className="text-sm font-black text-[#007A3D] truncate">{targetTier.name}</span>
                 </div>
               </div>
 
               {/* Status and Bio */}
               <div className="space-y-2 pt-1 text-xs">
-                <div className="p-3 bg-[#000000] rounded-2xl space-y-1 relative">
+                <div className={`p-3 ${innerBoxClass} rounded-2xl space-y-1 relative`}>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-[#F59E0B]">Current Status</span>
+                    <span className={`text-[10px] font-black uppercase ${goldLinkClass}`}>Current Status</span>
                     {isMyProfile && (
                       <button
                         type="button"
@@ -1375,7 +1594,7 @@ export default function App() {
                           setStatusDraft(myProfile.personalStatus);
                           setIsEditingStatus(true);
                         }}
-                        className="text-[10px] font-bold text-[#F59E0B] flex items-center space-x-1"
+                        className={`text-[10px] font-bold ${goldLinkClass} flex items-center space-x-1`}
                       >
                         <PencilIcon className="w-3 h-3" />
                         <span>Edit</span>
@@ -1414,13 +1633,13 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
-                  <span className="text-[10px] font-black uppercase text-[#F59E0B]">Lineage Bio</span>
-                  <p className="text-[#A1A1AA]">{targetProfile.bio}</p>
+                <div className={`p-3 ${innerBoxClass} rounded-2xl space-y-1`}>
+                  <span className={`text-[10px] font-black uppercase ${goldLinkClass}`}>Lineage Bio</span>
+                  <p className={subTextClass}>{targetProfile.bio}</p>
                 </div>
               </div>
 
-              {/* Passcard Actions */}
+              {/* Actions */}
               <div className="flex flex-col space-y-2 pt-2">
                 {!isMyProfile && (
                   <button
@@ -1436,7 +1655,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => handleGenerateShare(`${targetProfile.username}'s Passcard`, targetProfile.userId)}
-                    className="flex-1 py-3 bg-[#000000] text-[#FFFFFF] font-black text-xs uppercase rounded-2xl flex items-center justify-center space-x-1.5"
+                    className={`flex-1 py-3 ${innerBoxClass} text-current font-black text-xs uppercase rounded-2xl flex items-center justify-center space-x-1.5`}
                   >
                     <ShareIcon className="w-4 h-4 text-[#F59E0B]" />
                     <span>Share Passcard</span>
@@ -1447,7 +1666,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleOpenSanction("suspend")}
-                        className="px-4 py-3 bg-[#000000] text-[#F59E0B] font-black text-xs uppercase rounded-2xl"
+                        className={`px-4 py-3 ${innerBoxClass} ${goldLinkClass} font-black text-xs uppercase rounded-2xl`}
                       >
                         Suspend
                       </button>
@@ -1463,147 +1682,39 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            {/* Admin Sandbox Tools (Visible to Admins) */}
-            {isCurrentUserAdmin && (
-              <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#B91C1C]"></span>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-[#B91C1C]">Admin Sandbox Bench</h3>
-                  </div>
-                  <span className="text-[10px] text-[#A1A1AA] uppercase">Target: {targetProfile.username}</span>
-                </div>
-
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    placeholder="Find user by ID or Name..."
-                    value={adminMemberSearchTerm}
-                    onChange={(e) => setAdminMemberSearchTerm(e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs bg-[#000000] text-[#FFFFFF] rounded-2xl focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={startAdminCameraScanner}
-                    className="p-2.5 bg-[#000000] text-[#F59E0B] rounded-2xl"
-                  >
-                    <CameraIcon className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {adminMemberSearchTerm.trim() && (
-                  <div className="max-h-28 overflow-y-auto p-2 bg-[#000000] rounded-2xl space-y-1">
-                    {Object.values(profiles)
-                      .filter(
-                        (p) =>
-                          p.username.toLowerCase().includes(adminMemberSearchTerm.toLowerCase()) ||
-                          p.userId.toLowerCase().includes(adminMemberSearchTerm.toLowerCase())
-                      )
-                      .map((p) => (
-                        <div
-                          key={p.userId}
-                          onClick={() => {
-                            setSelectedProfileId(p.userId);
-                            setAdminMemberSearchTerm("");
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex justify-between items-center cursor-pointer hover:bg-[#18181B]"
-                        >
-                          <span className="text-[#FFFFFF]">{p.username}</span>
-                          <span className="text-[9px] text-[#F59E0B] font-mono">{p.userId}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                <div className="space-y-2 pt-1">
-                  <div className="grid grid-cols-4 gap-1.5 text-[10px] font-black">
-                    <button onClick={() => handleAdminAdjustSp(100)} className="py-2 bg-[#000000] text-[#FFFFFF] rounded-xl">+100</button>
-                    <button onClick={() => handleAdminAdjustSp(1000)} className="py-2 bg-[#000000] text-[#007A3D] rounded-xl">+1K</button>
-                    <button onClick={() => handleAdminAdjustSp(10000)} className="py-2 bg-[#000000] text-[#F59E0B] rounded-xl">+10K</button>
-                    <button onClick={() => handleAdminAdjustSp(50000)} className="py-2 bg-[#000000] text-[#F59E0B] rounded-xl">+50K</button>
-                  </div>
-
-                  <div className="flex space-x-1.5">
-                    <input
-                      type="number"
-                      placeholder="Set exact SP..."
-                      value={adminTargetSpInput}
-                      onChange={(e) => setAdminTargetSpInput(e.target.value)}
-                      className="flex-1 px-3 py-2 bg-[#000000] text-xs text-[#FFFFFF] rounded-2xl focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAdminSetSp}
-                      className="px-4 py-2 bg-[#F59E0B] text-[#000000] text-xs font-black uppercase rounded-2xl"
-                    >
-                      Set
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-[#000000] rounded-2xl space-y-2 mt-2">
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#F59E0B]">
-                    <span>Council Admin Delegation</span>
-                    <span
-                      className={`px-2 py-0.5 text-[9px] rounded-lg font-bold uppercase ${
-                        targetProfile.isAdmin ? "bg-[#007A3D] text-[#FFFFFF]" : "bg-[#18181B] text-[#A1A1AA]"
-                      }`}
-                    >
-                      {targetProfile.isAdmin ? "Council Admin" : "Standard Member"}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAdminRole(targetProfile)}
-                    className={`w-full py-2.5 px-3 text-xs font-black uppercase rounded-2xl ${
-                      targetProfile.isAdmin ? "bg-[#B91C1C] text-[#FFFFFF]" : "bg-[#007A3D] text-[#FFFFFF]"
-                    }`}
-                  >
-                    {targetProfile.isAdmin
-                      ? `Demote ${targetProfile.username} From Admin`
-                      : `Promote ${targetProfile.username} To Council Admin`}
-                  </button>
-                </div>
-
-                <div className="p-3 bg-[#000000] rounded-2xl space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px] font-black uppercase text-[#F59E0B]">
-                    <span>Share Audit Telemetry</span>
-                    <span>{shareAuditLogs.length} Records</span>
-                  </div>
-                  <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
-                    {shareAuditLogs.map((log) => (
-                      <div key={log.id} className="text-[10px] p-1.5 bg-[#18181B] rounded-xl flex justify-between items-center">
-                        <span className="font-mono text-[#F59E0B]">{log.trackingId}</span>
-                        <span className="text-[#A1A1AA] truncate max-w-[120px]">{log.targetName}</span>
-                        <span className="text-[#007A3D] font-bold">{log.clicks} clicks</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* ======================= TAB: COMMUNITY WALL & MULTIMEDIA COMPOSER ======================= */}
+        {/* ======================= TAB: COMMUNITY WALL & POLLS ======================= */}
         {currentTab === "feed" && (
           <div className="space-y-4">
+            {/* Status & Media Composer */}
             <div className={`p-4 rounded-3xl ${cardClass} space-y-3 relative shadow-xl`}>
-              <div className="flex items-center space-x-2">
-                <div
-                  className="w-8 h-8 rounded-2xl flex items-center justify-center text-xs font-black text-[#FFFFFF]"
-                  style={{ backgroundColor: myProfile.avatarBg || PALETTE.gold }}
-                >
-                  {myProfile.avatarText}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div
+                    className="w-8 h-8 rounded-2xl flex items-center justify-center text-xs font-black text-[#FFFFFF]"
+                    style={{ backgroundColor: myProfile.avatarBg || PALETTE.gold }}
+                  >
+                    {myProfile.avatarText}
+                  </div>
+                  <span className={`text-xs font-black uppercase ${goldLinkClass}`}>Community Wall</span>
                 </div>
-                <span className="text-xs font-black uppercase text-[#F59E0B]">Community Wall & Status Composer</span>
+
+                {/* Poll Launch Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setShowPollCreator(true)}
+                  className="flex items-center space-x-1 px-3 py-1.5 rounded-2xl bg-[#007A3D] text-[#FFFFFF] text-xs font-black uppercase tracking-wider active:scale-[0.98]"
+                >
+                  <PollIcon className="w-3.5 h-3.5" />
+                  <span>Create Poll</span>
+                </button>
               </div>
 
               {mentionQuery !== null && (
-                <div className="absolute left-4 right-4 top-16 z-30 p-2 rounded-2xl bg-[#000000] shadow-2xl space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#A1A1AA] px-2">Mention Cousin</span>
+                <div className={`absolute left-4 right-4 top-16 z-30 p-2 rounded-2xl ${innerBoxClass} shadow-2xl space-y-1`}>
+                  <span className={`text-[10px] font-black uppercase tracking-wider ${subTextClass} px-2`}>Mention Cousin</span>
                   <div className="max-h-32 overflow-y-auto space-y-1">
                     {Object.values(profiles)
                       .filter((p) => p.username.toLowerCase().includes(mentionQuery))
@@ -1611,10 +1722,10 @@ export default function App() {
                         <div
                           key={p.userId}
                           onClick={() => handleSelectMention(p.username)}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#FFFFFF] hover:bg-[#18181B] cursor-pointer flex justify-between"
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-current hover:bg-[#F59E0B] hover:text-[#000000] cursor-pointer flex justify-between"
                         >
                           <span>@{p.username}</span>
-                          <span className="text-[10px] text-[#F59E0B] font-normal">{p.socialProof} SP</span>
+                          <span className="text-[10px] font-normal">{p.socialProof} SP</span>
                         </div>
                       ))}
                   </div>
@@ -1630,7 +1741,6 @@ export default function App() {
                   className={`w-full p-3 rounded-2xl text-xs focus:outline-none resize-none ${inputClass}`}
                 />
 
-                {/* Attached Photo Preview */}
                 {attachedImage && (
                   <div className="relative rounded-2xl overflow-hidden bg-[#000000]">
                     <img src={attachedImage} alt="Attachment" className="max-h-52 w-full object-cover" />
@@ -1644,7 +1754,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Attached Video Preview */}
                 {attachedVideo && (
                   <div className="relative rounded-2xl overflow-hidden bg-[#000000]">
                     <video src={attachedVideo} controls className="max-h-52 w-full" />
@@ -1658,9 +1767,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Attached Audio Voice Note Preview */}
                 {attachedAudio && (
-                  <div className="flex items-center justify-between p-3 rounded-2xl bg-[#000000]">
+                  <div className={`flex items-center justify-between p-3 rounded-2xl ${innerBoxClass}`}>
                     <audio src={attachedAudio} controls className="h-9 w-full max-w-[240px]" />
                     <button
                       type="button"
@@ -1672,17 +1780,15 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Multimedia Attachments Bar */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center space-x-2">
-                    {/* Photo Capture / Upload */}
                     <button
                       type="button"
                       onClick={() => wallPhotoInputRef.current && wallPhotoInputRef.current.click()}
-                      className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                      className={`p-2.5 rounded-2xl ${innerBoxClass} hover:text-[#F59E0B]`}
                       title="Attach Photo or Take Live Selfie"
                     >
-                      <PhotoIcon className="w-4 h-4" />
+                      <PhotoIcon className="w-4 h-4 text-current" />
                     </button>
                     <input
                       type="file"
@@ -1697,14 +1803,13 @@ export default function App() {
                       }}
                     />
 
-                    {/* Video Capture / Upload */}
                     <button
                       type="button"
                       onClick={() => wallVideoInputRef.current && wallVideoInputRef.current.click()}
-                      className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                      className={`p-2.5 rounded-2xl ${innerBoxClass} hover:text-[#F59E0B]`}
                       title="Attach Video Clip"
                     >
-                      <VideoIcon className="w-4 h-4" />
+                      <VideoIcon className="w-4 h-4 text-current" />
                     </button>
                     <input
                       type="file"
@@ -1719,15 +1824,14 @@ export default function App() {
                       }}
                     />
 
-                    {/* Live Voice Note Recorder */}
                     {!isRecordingAudio ? (
                       <button
                         type="button"
                         onClick={handleStartAudioRecord}
-                        className="p-2.5 rounded-2xl bg-[#000000] text-[#FFFFFF] hover:text-[#F59E0B] transition-colors"
+                        className={`p-2.5 rounded-2xl ${innerBoxClass} hover:text-[#F59E0B]`}
                         title="Record Live Voice Note"
                       >
-                        <MicIcon className="w-4 h-4" />
+                        <MicIcon className="w-4 h-4 text-current" />
                       </button>
                     ) : (
                       <button
@@ -1751,38 +1855,249 @@ export default function App() {
               </form>
             </div>
 
-            {/* Live Feed Stream with Multimedia Rendering */}
+            {/* Live Feed Stream with Polls & Answers */}
             <div className="space-y-3">
-              {feedLogs.map((item) => (
-                <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2.5 shadow-lg`}>
-                  {item.type === "vouch" && (
-                    <div className="flex items-center space-x-2 text-xs">
+              {feedLogs.map((item) => {
+                if (item.type === "poll") {
+                  const poll = polls[item.pollId];
+                  if (!poll) return null;
+                  const isCreator = poll.creatorId === currentUserId;
+                  const isExpired = Date.now() > poll.expiresAt;
+                  const totalVotes = Object.keys(poll.votes || {}).length;
+                  const userVoteIndex = poll.votes?.[currentUserId];
+
+                  // Calculate winning option(s) for multiple/ab polls
+                  let winningIndexes = [];
+                  if (isExpired && poll.type !== "fill" && totalVotes > 0) {
+                    const counts = poll.options.map((_, idx) => {
+                      return Object.values(poll.votes).filter((v) => v === idx).length;
+                    });
+                    const maxCount = Math.max(...counts);
+                    winningIndexes = counts
+                      .map((c, i) => (c === maxCount && maxCount > 0 ? i : -1))
+                      .filter((i) => i !== -1);
+                  }
+
+                  const timeLeftHours = Math.max(0, Math.ceil((poll.expiresAt - Date.now()) / (1000 * 60 * 60)));
+
+                  return (
+                    <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-lg`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded-lg bg-[#B91C1C] text-[#FFFFFF] text-[10px] font-black uppercase tracking-wider">
+                            {poll.type === "ab" ? "A/B Poll" : poll.type === "multiple" ? "Multiple Choice" : "Fill In Blank"}
+                          </span>
+                          <span
+                            onClick={() => {
+                              setSelectedProfileId(poll.creatorId);
+                              setCurrentTab("home");
+                            }}
+                            className={`text-xs font-black cursor-pointer ${goldLinkClass}`}
+                          >
+                            @{poll.creatorName}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center space-x-1.5">
+                          {isExpired ? (
+                            <span className="flex items-center space-x-1 text-[10px] font-black uppercase text-[#B91C1C]">
+                              <LockClosedIcon className="w-3 h-3" />
+                              <span>Ended • Highlighted</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-[#007A3D]">
+                              {timeLeftHours}h remaining
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-sm font-black text-current leading-snug">
+                        {poll.question}
+                      </p>
+
+                      {/* Options rendering for A/B and Multiple Choice */}
+                      {poll.type !== "fill" && (
+                        <div className="space-y-2 pt-1">
+                          {poll.options.map((opt, idx) => {
+                            const optionVoteCount = Object.values(poll.votes || {}).filter((v) => v === idx).length;
+                            const percent = totalVotes > 0 ? Math.round((optionVoteCount / totalVotes) * 100) : 0;
+                            const isSelected = userVoteIndex === idx;
+                            const isWinner = isExpired && winningIndexes.includes(idx);
+
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                disabled={isExpired}
+                                onClick={() => handleVotePoll(poll.id, idx)}
+                                className={`w-full p-3 rounded-2xl text-left relative overflow-hidden transition-all ${
+                                  isWinner
+                                    ? "bg-[#007A3D] text-[#FFFFFF] shadow-md ring-2 ring-[#F59E0B]"
+                                    : isSelected
+                                    ? "bg-[#F59E0B] text-[#000000] font-black"
+                                    : `${innerBoxClass} hover:bg-opacity-80`
+                                }`}
+                              >
+                                {totalVotes > 0 && (
+                                  <div
+                                    className={`absolute left-0 top-0 bottom-0 opacity-20 ${
+                                      isWinner ? "bg-[#FFFFFF]" : "bg-[#007A3D]"
+                                    }`}
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                )}
+
+                                <div className="relative z-10 flex items-center justify-between text-xs font-bold">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] bg-black bg-opacity-20">
+                                      {String.fromCharCode(65 + idx)}
+                                    </span>
+                                    <span>{opt}</span>
+                                    {isWinner && (
+                                      <span className="px-2 py-0.5 rounded text-[9px] bg-[#FFFFFF] text-[#007A3D] font-black uppercase">
+                                        Top Answer
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span>{percent}% ({optionVoteCount})</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Fill in the blank answering form */}
+                      {poll.type === "fill" && (
+                        <div className="space-y-2.5 pt-1">
+                          {!isExpired ? (
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                placeholder="Write your fill-in response..."
+                                value={fillAnswerInputs[poll.id] || ""}
+                                onChange={(e) =>
+                                  setFillAnswerInputs((prev) => ({ ...prev, [poll.id]: e.target.value }))
+                                }
+                                onKeyDown={(e) => e.key === "Enter" && handleSubmitFillAnswer(poll.id)}
+                                className={`flex-1 p-3 text-xs rounded-2xl focus:outline-none ${inputClass}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSubmitFillAnswer(poll.id)}
+                                className="px-4 py-3 bg-[#007A3D] text-[#FFFFFF] text-xs font-black uppercase rounded-2xl"
+                              >
+                                Send
+                              </button>
+                            </div>
+                          ) : (
+                            <p className={`text-xs italic ${subTextClass}`}>
+                              Fill-in-the-blank poll has closed.
+                            </p>
+                          )}
+
+                          {/* Creator-Only Answer Inspection Button */}
+                          {isCreator && (
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActivePollAnswersView(activePollAnswersView === poll.id ? null : poll.id)
+                                }
+                                className="w-full py-2.5 bg-[#F59E0B] text-[#000000] font-black text-xs uppercase rounded-2xl flex items-center justify-center space-x-1.5"
+                              >
+                                <span>Answers ({poll.fillResponses?.length || 0}) — Creator Only</span>
+                              </button>
+
+                              {activePollAnswersView === poll.id && (
+                                <div className={`mt-2 p-3 ${innerBoxClass} rounded-2xl space-y-2`}>
+                                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-[#F59E0B]">
+                                    <span>Confidential Answers</span>
+                                    <span>Only You Can See This</span>
+                                  </div>
+
+                                  {(!poll.fillResponses || poll.fillResponses.length === 0) ? (
+                                    <p className={`text-xs ${subTextClass}`}>No answers submitted yet.</p>
+                                  ) : (
+                                    poll.fillResponses.map((resp) => (
+                                      <div
+                                        key={resp.id}
+                                        className={`p-3 ${theme === "dark" ? "bg-[#18181B]" : "bg-[#FFFFFF]"} rounded-2xl space-y-2`}
+                                      >
+                                        <div className="flex justify-between items-center text-xs">
+                                          <span className={`font-black ${goldLinkClass}`}>
+                                            @{resp.username}
+                                          </span>
+                                          <span className={`text-[10px] ${subTextClass}`}>
+                                            {new Date(resp.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-current font-medium">"{resp.text}"</p>
+
+                                        {/* Creator Reply-as-PNG Button */}
+                                        <button
+                                          type="button"
+                                          onClick={() => setReplyModalData({ poll, response: resp })}
+                                          className="w-full py-2 bg-[#007A3D] text-[#FFFFFF] text-[11px] font-black uppercase rounded-xl"
+                                        >
+                                          Reply & Post as .PNG to Wall
+                                        </button>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {!isCreator && (
+                            <p className={`text-[10px] ${subTextClass} flex items-center space-x-1`}>
+                              <LockClosedIcon className="w-3 h-3 text-[#F59E0B]" />
+                              <span>Answers are private to the poll author until highlighted.</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (item.type === "vouch") {
+                  return (
+                    <div key={item.id} className={`p-4 rounded-3xl ${cardClass} flex items-center space-x-2 text-xs shadow-lg`}>
                       <span className="p-1.5 rounded-xl bg-[#007A3D] text-[#FFFFFF] font-black text-[10px]">+SP</span>
                       <p className="text-current">
-                        <span className="font-bold text-[#F59E0B]">{item.authorName}</span> vouched for{" "}
-                        <span className="font-bold text-[#FFFFFF]">{item.targetName}</span> (+{item.amount} SP)
+                        <span className={`font-bold ${goldLinkClass}`}>{item.authorName}</span> vouched for{" "}
+                        <span className="font-bold text-current">{item.targetName}</span> (+{item.amount} SP)
                       </p>
                     </div>
-                  )}
+                  );
+                }
 
-                  {item.type === "sanction" && (
-                    <div className="p-3 bg-[#000000] rounded-2xl space-y-1">
+                if (item.type === "sanction") {
+                  return (
+                    <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-1 shadow-lg`}>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase text-[#B91C1C]">Council Sanction Enacted</span>
-                        <span className="text-[9px] text-[#A1A1AA]">{new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className={`text-[9px] ${subTextClass}`}>
+                          {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       </div>
-                      <p className="text-xs font-bold text-[#FFFFFF]">
+                      <p className="text-xs font-bold text-current">
                         {item.authorName} {item.action} {item.targetName}
                       </p>
-                      <p className="text-xs italic text-[#A1A1AA]">"{item.reason}"</p>
+                      <p className={`text-xs italic ${subTextClass}`}>"{item.reason}"</p>
                     </div>
-                  )}
+                  );
+                }
 
-                  {item.type === "wall_post" && (
-                    <div className="space-y-2">
+                if (item.type === "wall_post") {
+                  return (
+                    <div key={item.id} className={`p-4 rounded-3xl ${cardClass} space-y-2 shadow-lg`}>
                       <div className="flex items-center justify-between">
                         <span
-                          className="text-xs font-black text-[#F59E0B] cursor-pointer"
+                          className={`text-xs font-black cursor-pointer ${goldLinkClass}`}
                           onClick={() => {
                             if (item.authorId) {
                               setSelectedProfileId(item.authorId);
@@ -1790,9 +2105,9 @@ export default function App() {
                             }
                           }}
                         >
-                          {item.authorName}
+                          @{item.authorName}
                         </span>
-                        <span className="text-[10px] text-[#A1A1AA]">
+                        <span className={`text-[10px] ${subTextClass}`}>
                           {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
@@ -1814,7 +2129,7 @@ export default function App() {
                                       setCurrentTab("home");
                                     }
                                   }}
-                                  className="font-bold text-[#F59E0B] cursor-pointer hover:underline mr-1"
+                                  className={`font-black ${goldLinkClass} cursor-pointer hover:underline mr-1`}
                                 >
                                   {word}{" "}
                                 </span>
@@ -1825,30 +2140,29 @@ export default function App() {
                         </p>
                       )}
 
-                      {/* Display Post Image */}
                       {item.image && (
                         <div className="rounded-2xl overflow-hidden bg-[#000000]">
-                          <img src={item.image} alt="Wall attachment" className="max-h-64 w-full object-cover" />
+                          <img src={item.image} alt="Wall attachment" className="max-h-80 w-full object-contain bg-[#18181B]" />
                         </div>
                       )}
 
-                      {/* Display Post Video */}
                       {item.video && (
                         <div className="rounded-2xl overflow-hidden bg-[#000000]">
                           <video src={item.video} controls className="max-h-64 w-full" />
                         </div>
                       )}
 
-                      {/* Display Post Audio Voice Note */}
                       {item.audio && (
-                        <div className="p-2.5 rounded-2xl bg-[#000000]">
+                        <div className={`p-2.5 rounded-2xl ${innerBoxClass}`}>
                           <audio src={item.audio} controls className="w-full h-8" />
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                }
+
+                return null;
+              })}
             </div>
           </div>
         )}
@@ -1857,7 +2171,7 @@ export default function App() {
         {currentTab === "friends" && (
           <div className="space-y-3">
             <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
-              <h2 className="text-sm font-black uppercase tracking-wider text-[#F59E0B]">Community Directory</h2>
+              <h2 className={`text-sm font-black uppercase tracking-wider ${goldLinkClass}`}>Community Directory</h2>
               <input
                 type="text"
                 placeholder="Search cousins by name or ID..."
@@ -1895,13 +2209,13 @@ export default function App() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-[#F59E0B] font-bold">{tier.name}</p>
+                        <p className={`text-[10px] font-bold ${goldLinkClass}`}>{tier.name}</p>
                       </div>
                     </div>
 
                     <div className="text-right">
                       <span className="text-sm font-black text-current">{p.socialProof}</span>
-                      <p className="text-[9px] text-[#A1A1AA] uppercase">SP</p>
+                      <p className={`text-[9px] ${subTextClass} uppercase`}>SP</p>
                     </div>
                   </div>
                 );
@@ -1916,15 +2230,15 @@ export default function App() {
             <div className={`p-4 rounded-3xl ${cardClass} space-y-3 shadow-xl`}>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-black uppercase tracking-wider text-[#B91C1C]">Hall of Accountability</h2>
-                <span className="text-[10px] text-[#A1A1AA]">{filteredBanned.length} Members</span>
+                <span className={`text-[10px] ${subTextClass}`}>{filteredBanned.length} Members</span>
               </div>
 
-              <div className="flex rounded-2xl bg-[#000000] p-1">
+              <div className={`flex rounded-2xl ${innerBoxClass} p-1`}>
                 <button
                   type="button"
                   onClick={() => setBannedFilter("all")}
                   className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-xl ${
-                    bannedFilter === "all" ? "bg-[#18181B] text-[#FFFFFF]" : "text-[#A1A1AA]"
+                    bannedFilter === "all" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
                   }`}
                 >
                   All
@@ -1933,7 +2247,7 @@ export default function App() {
                   type="button"
                   onClick={() => setBannedFilter("revoked")}
                   className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-xl ${
-                    bannedFilter === "revoked" ? "bg-[#B91C1C] text-[#FFFFFF]" : "text-[#A1A1AA]"
+                    bannedFilter === "revoked" ? "bg-[#B91C1C] text-[#FFFFFF]" : subTextClass
                   }`}
                 >
                   Revoked
@@ -1942,7 +2256,7 @@ export default function App() {
                   type="button"
                   onClick={() => setBannedFilter("suspended")}
                   className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-xl ${
-                    bannedFilter === "suspended" ? "bg-[#F59E0B] text-[#000000]" : "text-[#A1A1AA]"
+                    bannedFilter === "suspended" ? "bg-[#F59E0B] text-[#000000]" : subTextClass
                   }`}
                 >
                   Suspended
@@ -1952,7 +2266,7 @@ export default function App() {
 
             <div className="space-y-2">
               {filteredBanned.length === 0 ? (
-                <p className="text-center text-xs text-[#A1A1AA] py-8">No members currently in the penalty box.</p>
+                <p className={`text-center text-xs ${subTextClass} py-8`}>No members currently in the penalty box.</p>
               ) : (
                 filteredBanned.map((p) => (
                   <div
@@ -1983,7 +2297,7 @@ export default function App() {
 
                     <div className="text-right">
                       <span className="text-xs font-mono font-bold text-current">{p.socialProof} SP</span>
-                      <p className="text-[9px] text-[#A1A1AA]">
+                      <p className={`text-[9px] ${subTextClass}`}>
                         {p.blackCardStatus === "revoked" ? "Needs 100 SP" : "Time Remaining"}
                       </p>
                     </div>
@@ -1995,6 +2309,204 @@ export default function App() {
         )}
       </main>
 
+      {/* ======================= MODAL: CREATE 24-HOUR POLL ======================= */}
+      {showPollCreator && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
+          <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} space-y-4 shadow-2xl`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <PollIcon className="w-5 h-5 text-[#007A3D]" />
+                <h3 className={`text-xs font-black uppercase ${goldLinkClass}`}>Create 24-Hour Poll</h3>
+              </div>
+              <button onClick={() => setShowPollCreator(false)} className={subTextClass}>
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Poll Type Selector */}
+            <div className={`flex rounded-2xl ${innerBoxClass} p-1 text-[11px] font-black uppercase`}>
+              <button
+                type="button"
+                onClick={() => setPollType("ab")}
+                className={`flex-1 py-1.5 rounded-xl ${
+                  pollType === "ab" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
+                }`}
+              >
+                A / B
+              </button>
+              <button
+                type="button"
+                onClick={() => setPollType("multiple")}
+                className={`flex-1 py-1.5 rounded-xl ${
+                  pollType === "multiple" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
+                }`}
+              >
+                Choice (4)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPollType("fill")}
+                className={`flex-1 py-1.5 rounded-xl ${
+                  pollType === "fill" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
+                }`}
+              >
+                Fill Blank
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePoll} className="space-y-3">
+              <div>
+                <label className={`text-[10px] font-black uppercase tracking-wider ${subTextClass} block mb-1`}>
+                  Poll Question / Prompt
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  placeholder="e.g. Which city has the greatest food scene?"
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  className={`w-full p-3 rounded-2xl text-xs focus:outline-none resize-none ${inputClass}`}
+                />
+              </div>
+
+              {/* A/B Inputs */}
+              {pollType === "ab" && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Option A (e.g. Chicago)"
+                    value={pollOptionA}
+                    onChange={(e) => setPollOptionA(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl text-xs focus:outline-none ${inputClass}`}
+                  />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Option B (e.g. Atlanta)"
+                    value={pollOptionB}
+                    onChange={(e) => setPollOptionB(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl text-xs focus:outline-none ${inputClass}`}
+                  />
+                </div>
+              )}
+
+              {/* Multiple Choice Inputs */}
+              {pollType === "multiple" && (
+                <div className="space-y-2">
+                  {pollMultipleOptions.map((opt, i) => (
+                    <input
+                      key={i}
+                      type="text"
+                      placeholder={`Option ${i + 1}`}
+                      value={opt}
+                      onChange={(e) => {
+                        const next = [...pollMultipleOptions];
+                        next[i] = e.target.value;
+                        setPollMultipleOptions(next);
+                      }}
+                      className={`w-full p-2.5 rounded-xl text-xs focus:outline-none ${inputClass}`}
+                    />
+                  ))}
+                  {pollMultipleOptions.length < 4 && (
+                    <button
+                      type="button"
+                      onClick={() => setPollMultipleOptions((prev) => [...prev, ""])}
+                      className={`text-[10px] font-bold ${goldLinkClass}`}
+                    >
+                      + Add 4th option
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Fill Blank description */}
+              {pollType === "fill" && (
+                <div className={`p-3 ${innerBoxClass} rounded-2xl text-[11px] ${subTextClass} space-y-1`}>
+                  <p className="font-bold text-current">Creator Private Answer Protection:</p>
+                  <p>Answers will be hidden from everyone except you. You can review submissions and post spotlight replies as a .PNG image card.</p>
+                </div>
+              )}
+
+              <p className={`text-[10px] font-bold ${subTextClass}`}>
+                ⏱ Poll automatically expires in 24 hours. The highest voted answers will highlight in bold color.
+              </p>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPollCreator(false)}
+                  className={`flex-1 py-3 ${innerBoxClass} text-current text-xs font-black uppercase rounded-2xl`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-[#007A3D] text-[#FFFFFF] text-xs font-black uppercase rounded-2xl active:scale-[0.98] transition-transform"
+                >
+                  Publish Poll
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL: CREATOR REPLY AS PNG ======================= */}
+      {replyModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
+          <div className={`w-full max-w-sm p-6 rounded-3xl ${cardClass} space-y-4 shadow-2xl`}>
+            <div className="flex items-center justify-between">
+              <h3 className={`text-xs font-black uppercase ${goldLinkClass}`}>Reply & Export to PNG Card</h3>
+              <button onClick={() => setReplyModalData(null)} className={subTextClass}>
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className={`p-3 ${innerBoxClass} rounded-2xl space-y-1 text-xs`}>
+              <span className={`font-black ${goldLinkClass}`}>@{replyModalData.response.username}'s Answer:</span>
+              <p className="italic text-current">"{replyModalData.response.text}"</p>
+            </div>
+
+            <form onSubmit={handlePostReplyAsPng} className="space-y-3">
+              <div>
+                <label className={`text-[10px] font-black uppercase tracking-wider ${subTextClass} block mb-1`}>
+                  Your Official Response
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Add your response or commentary to this cousin's answer..."
+                  value={replyCommentText}
+                  onChange={(e) => setReplyCommentText(e.target.value)}
+                  className={`w-full p-3 rounded-2xl text-xs focus:outline-none resize-none ${inputClass}`}
+                />
+              </div>
+
+              <p className={`text-[10px] ${subTextClass}`}>
+                This will generate an official The Black Card PNG graphics card with their response and publish it directly to your Community Wall.
+              </p>
+
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setReplyModalData(null)}
+                  className={`flex-1 py-3 ${innerBoxClass} text-current text-xs font-black uppercase rounded-2xl`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-[#007A3D] text-[#FFFFFF] text-xs font-black uppercase rounded-2xl active:scale-[0.98] transition-transform"
+                >
+                  Post as PNG
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ======================= MODAL: REAL SCANNABLE QR CODE ======================= */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#000000] bg-opacity-90">
@@ -2002,10 +2514,9 @@ export default function App() {
             <BlackAmericanHeritageLogo className="w-12 h-8 mx-auto" roundClass="rounded-lg" />
             <div>
               <h3 className="text-sm font-black uppercase text-current">{targetProfile.username}</h3>
-              <p className="text-[10px] text-[#F59E0B] font-bold">{targetTier.name}</p>
+              <p className={`text-[10px] font-bold ${goldLinkClass}`}>{targetTier.name}</p>
             </div>
 
-            {/* Real Scannable QR SVG representation */}
             <div className="p-3 bg-[#FFFFFF] rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-lg">
               <RealQRCodeSVG
                 value={`https://theblackcard.app/passcard?uid=${targetProfile.userId}&name=${encodeURIComponent(targetProfile.username)}`}
@@ -2013,7 +2524,7 @@ export default function App() {
               />
             </div>
 
-            <p className="text-[11px] font-mono text-[#A1A1AA]">{targetProfile.userId}</p>
+            <p className={`text-[11px] font-mono ${subTextClass}`}>{targetProfile.userId}</p>
 
             <button
               type="button"
@@ -2034,13 +2545,13 @@ export default function App() {
               <h3 className="text-xs font-black uppercase text-[#B91C1C]">
                 Propose {showSanctionModal.action === "revoke" ? "Revocation" : "30-Day Suspension"}
               </h3>
-              <button onClick={() => setShowSanctionModal(null)} className="text-[#A1A1AA]">
+              <button onClick={() => setShowSanctionModal(null)} className={subTextClass}>
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-[#A1A1AA]">
-              State the reason for holding <span className="font-bold text-[#FFFFFF]">{targetProfile.username}</span> accountable.
+            <p className={`text-xs ${subTextClass}`}>
+              State the reason for holding <span className="font-bold text-current">{targetProfile.username}</span> accountable.
             </p>
 
             <form onSubmit={handleSubmitSanction} className="space-y-3">
@@ -2056,7 +2567,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowSanctionModal(null)}
-                  className="flex-1 py-3 bg-[#000000] text-[#FFFFFF] text-xs font-black uppercase rounded-2xl"
+                  className={`flex-1 py-3 ${innerBoxClass} text-current text-xs font-black uppercase rounded-2xl`}
                 >
                   Cancel
                 </button>
@@ -2074,50 +2585,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ======================= MODAL: CAMERA SCANNER ======================= */}
-      {showAdminScanner && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-[#000000] bg-opacity-95">
-          <div className="w-full max-w-sm space-y-4 text-center">
-            <h3 className="text-sm font-black uppercase text-[#F59E0B]">Passcard Scanner Viewfinder</h3>
-            <div className="relative w-full aspect-square bg-[#18181B] rounded-3xl overflow-hidden flex items-center justify-center shadow-2xl">
-              <video ref={scannerVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              <div className="absolute inset-8 rounded-2xl pointer-events-none flex items-center justify-center">
-                <span className="text-[10px] font-black uppercase text-[#F59E0B] bg-[#000000] px-2 py-1 rounded">
-                  Align QR Code
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[10px] text-[#A1A1AA] uppercase">Or select member directly:</span>
-              <div className="flex flex-wrap gap-1.5 justify-center max-h-24 overflow-y-auto">
-                {Object.values(profiles).map((p) => (
-                  <button
-                    key={p.userId}
-                    onClick={() => {
-                      setSelectedProfileId(p.userId);
-                      stopAdminCameraScanner();
-                      triggerNotification(`Loaded passcard for ${p.username}.`);
-                    }}
-                    className="px-2.5 py-1 bg-[#18181B] text-[#FFFFFF] text-[10px] font-bold rounded-2xl"
-                  >
-                    {p.username}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={stopAdminCameraScanner}
-              className="w-full py-3 bg-[#B91C1C] text-[#FFFFFF] font-black text-xs uppercase rounded-2xl"
-            >
-              Close Scanner
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ======================= BOTTOM APP NAVIGATION ======================= */}
       <nav
         className={`fixed bottom-0 inset-x-0 z-40 max-w-md mx-auto px-6 py-2.5 flex items-center justify-between rounded-t-3xl shadow-2xl ${
@@ -2131,7 +2598,7 @@ export default function App() {
             setCurrentTab("home");
           }}
           className={`p-3 rounded-2xl flex flex-col items-center space-y-1 ${
-            currentTab === "home" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
+            currentTab === "home" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
           }`}
           title="Passcard"
         >
@@ -2142,9 +2609,9 @@ export default function App() {
           type="button"
           onClick={() => setCurrentTab("feed")}
           className={`p-3 rounded-2xl flex flex-col items-center space-y-1 ${
-            currentTab === "feed" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
+            currentTab === "feed" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
           }`}
-          title="Community Wall & Feed"
+          title="Community Wall & Polls"
         >
           <FeedIcon className="w-5 h-5" />
         </button>
@@ -2153,7 +2620,7 @@ export default function App() {
           type="button"
           onClick={() => setCurrentTab("friends")}
           className={`p-3 rounded-2xl flex flex-col items-center space-y-1 ${
-            currentTab === "friends" ? "bg-[#007A3D] text-[#FFFFFF]" : "text-[#A1A1AA]"
+            currentTab === "friends" ? "bg-[#007A3D] text-[#FFFFFF]" : subTextClass
           }`}
           title="Directory"
         >
@@ -2164,7 +2631,7 @@ export default function App() {
           type="button"
           onClick={() => setCurrentTab("banned")}
           className={`p-3 rounded-2xl flex flex-col items-center space-y-1 ${
-            currentTab === "banned" ? "bg-[#B91C1C] text-[#FFFFFF]" : "text-[#A1A1AA]"
+            currentTab === "banned" ? "bg-[#B91C1C] text-[#FFFFFF]" : subTextClass
           }`}
           title="Penalty Box"
         >
